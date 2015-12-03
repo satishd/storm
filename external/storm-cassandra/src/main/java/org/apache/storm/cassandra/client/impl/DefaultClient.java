@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
+ * <p>
  * http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -36,25 +36,25 @@ import java.util.Set;
  * Simple class to wrap cassandra {@link com.datastax.driver.core.Cluster} instance.
  */
 public class DefaultClient implements SimpleClient, Closeable, Serializable {
-    
+
     private final static Logger LOG = LoggerFactory.getLogger(DefaultClient.class);
-    
+
     private String keyspace;
 
     private Cluster cluster;
-    
+
     private Session session;
 
     /**
      * Create a new {@link DefaultClient} instance.
-     * 
+     *
      * @param cluster a cassandra cluster client.
      */
     public DefaultClient(Cluster cluster, String keyspace) {
         Preconditions.checkNotNull(cluster, "Cluster cannot be 'null");
         this.cluster = cluster;
         this.keyspace = keyspace;
-        
+
     }
 
     public Set<Host> getAllHosts() {
@@ -71,14 +71,15 @@ public class DefaultClient implements SimpleClient, Closeable, Serializable {
         Thread thread = Thread.currentThread();
         return thread.getName();
     }
+
     /**
      * {@inheritDoc}
      */
     @Override
     public synchronized Session connect() throws NoHostAvailableException {
-        if( isDisconnected() ) {
+        if (isDisconnected()) {
             LOG.info("Connected to cluster: {}", cluster.getClusterName());
-            for ( Host host : getAllHosts())
+            for (Host host : getAllHosts())
                 LOG.info("Datacenter: {}; Host: {}; Rack: {}", host.getDatacenter(), host.getAddress(), host.getRack());
 
             LOG.info("Connect to cluster using keyspace %s", keyspace);
@@ -87,7 +88,7 @@ public class DefaultClient implements SimpleClient, Closeable, Serializable {
             LOG.warn("{} - Already connected to cluster: {}", getExecutorName(), cluster.getClusterName());
         }
 
-        if( session.isClosed() ) {
+        if (session.isClosed()) {
             LOG.warn("Session has been closed - create new one!");
             this.session = cluster.newSession();
         }
@@ -105,13 +106,14 @@ public class DefaultClient implements SimpleClient, Closeable, Serializable {
      * {@inheritDoc}
      */
     @Override
-    public void close( ) {
-        if( cluster != null && !cluster.isClosed() ) {
+    public void close() {
+        if (cluster != null && !cluster.isClosed()) {
             LOG.info("Try to close connection to cluster: {}", cluster.getClusterName());
             session.close();
             cluster.close();
         }
     }
+
     /**
      * {@inheritDoc}
      */

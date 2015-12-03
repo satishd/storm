@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
+ * <p>
  * http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -52,7 +52,7 @@ public class WeatherSpout extends BaseRichSpout {
 
     @Override
     public void declareOutputFields(OutputFieldsDeclarer outputFieldsDeclarer) {
-        outputFieldsDeclarer.declare(new Fields("weatherstation_id", "temperature"));
+        outputFieldsDeclarer.declare(new Fields("weather_station_id", "temperature"));
     }
 
     @Override
@@ -77,7 +77,7 @@ public class WeatherSpout extends BaseRichSpout {
 
     @Override
     public void nextTuple() {
-        if(  emit.get() < maxQueries.get() ) {
+        if (emit.get() < maxQueries.get()) {
             spoutOutputCollector.emit(new Values(stationID, "38°C"), emit.incrementAndGet());
         }
     }

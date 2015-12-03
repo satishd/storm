@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
+ * <p>
  * http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -26,7 +26,9 @@ import org.junit.Assert;
 import org.junit.Ignore;
 import org.junit.Test;
 
-import static org.apache.storm.cassandra.DynamicStatementBuilder.*;
+import static org.apache.storm.cassandra.DynamicStatementBuilder.field;
+import static org.apache.storm.cassandra.DynamicStatementBuilder.insertInto;
+import static org.apache.storm.cassandra.DynamicStatementBuilder.with;
 
 
 /**
@@ -34,16 +36,17 @@ import static org.apache.storm.cassandra.DynamicStatementBuilder.*;
  */
 public class BatchCassandraWriterBoltTest extends BaseTopologyTest {
 
-    public static final String SPOUT_MOCK  = "spout-mock";
+    public static final String SPOUT_MOCK = "spout-mock";
     public static final String BOLT_WRITER = "writer";
 
-    @Test @Ignore("The sleep method should be used in tests")
+    @Test
+    @Ignore("The sleep method should be used in tests")
     public void shouldBatchInsertGivenStaticTableNameAndDynamicQueryBuildFromAllTupleFields() {
         executeAndAssertWith(100000, new BatchCassandraWriterBolt(getInsertInto()));
     }
 
     private SimpleCQLStatementTupleMapper getInsertInto() {
-        return insertInto("weather", "temperature").values(with(field("weatherstation_id"), field("event_time").now(), field("temperature"))).build();
+        return insertInto("weather", "temperature").values(with(field("weather_station_id"), field("event_time").now(), field("temperature"))).build();
     }
 
     protected void executeAndAssertWith(final int maxQueries, final BaseCassandraBolt bolt) {
@@ -57,7 +60,7 @@ public class BatchCassandraWriterBoltTest extends BaseTopologyTest {
 
         runLocalTopologyAndWait(builder);
 
-        ResultSet rows = cassandraCQLUnit.session.execute("SELECT * FROM weather.temperature WHERE weatherstation_id='test'");
+        ResultSet rows = cassandraCQLUnit.session.execute("SELECT * FROM weather.temperature WHERE weather_station_id='test'");
         Assert.assertEquals(maxQueries, rows.all().size());
     }
 }

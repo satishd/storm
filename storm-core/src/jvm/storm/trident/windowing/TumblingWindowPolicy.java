@@ -18,15 +18,15 @@
  */
 package storm.trident.windowing;
 
-import storm.trident.Stream;
+import backtype.storm.topology.base.BaseWindowedBolt;
 
 /**
  * This policy specifies the tuples to be grouped in a window with {@link #windowDuration} and starts a new window once it reaches {@link #windowDuration}
  */
 public class TumblingWindowPolicy extends WindowPolicy {
-    private final Stream.Duration windowDuration;
+    private final BaseWindowedBolt.Duration windowDuration;
 
-    public TumblingWindowPolicy(Stream.Duration windowDuration, Stream.Duration slidingInterval) {
+    public TumblingWindowPolicy(BaseWindowedBolt.Duration windowDuration) {
         this.windowDuration = windowDuration;
     }
 }

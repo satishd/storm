@@ -22,7 +22,6 @@ import backtype.storm.generated.NullStruct;
 import backtype.storm.grouping.CustomStreamGrouping;
 import backtype.storm.tuple.Fields;
 import backtype.storm.utils.Utils;
-import backtype.storm.windowing.Window;
 import storm.trident.fluent.ChainedAggregatorDeclarer;
 import storm.trident.fluent.GlobalAggregationScheme;
 import storm.trident.fluent.GroupedStream;
@@ -33,8 +32,6 @@ import storm.trident.operation.CombinerAggregator;
 import storm.trident.operation.Filter;
 import storm.trident.operation.Function;
 import storm.trident.operation.ReducerAggregator;
-import storm.trident.operation.TridentCollector;
-import storm.trident.operation.TridentOperationContext;
 import storm.trident.operation.impl.CombinerAggStateUpdater;
 import storm.trident.operation.impl.FilterExecutor;
 import storm.trident.operation.impl.GlobalBatchToPartition;
@@ -58,10 +55,10 @@ import storm.trident.state.QueryFunction;
 import storm.trident.state.StateFactory;
 import storm.trident.state.StateSpec;
 import storm.trident.state.StateUpdater;
-import storm.trident.tuple.TridentTuple;
 import storm.trident.util.TridentUtils;
-
-import java.util.Map;
+import storm.trident.windowing.TridentWindow;
+import storm.trident.windowing.WindowAggregator;
+import storm.trident.windowing.WindowPolicy;
 
 // TODO: need to be able to replace existing fields with the function fields (like Cascading Fields.REPLACE)
 public class Stream implements IAggregatableStream {
@@ -209,142 +206,6 @@ public class Stream implements IAggregatableStream {
         return each(inputFields, new FilterExecutor(filter), new Fields());
     }
 
-    static class Count {
-        final int value;
-
-        public Count(int value) {
-            this.value = value;
-        }
-    }
-
-    static class Duration {
-        final int value;
-
-        Duration(int value) {
-            this.value = value;
-        }
-    }
-
-    /**
-     * Abstract window policy with {@link storm.trident.Stream.Evictor} and {@link storm.trident.Stream.Trigger}.
-     */
-    public abstract class WindowPolicy {
-
-        protected Evictor evictor;
-        protected Trigger trigger;
-
-        public Evictor getEvictor() {
-            return evictor;
-        }
-
-        public void setEvictor(Evictor evictor) {
-            this.evictor = evictor;
-        }
-
-        public Trigger getTrigger() {
-            return trigger;
-        }
-
-        public void setTrigger(Trigger trigger) {
-            this.trigger = trigger;
-        }
-    }
-
-    /**
-     * This policy assigns all tuples in the stream to the same window.
-     */
-    public class GlobalWindowPolicy extends WindowPolicy{
-    }
-
-    /**
-     * This policy specifies the tuples to be grouped in a window with @{link #windowDuration} and it slides every {@link #slidingInterval}
-     */
-    public class SlidingWindowPolicy extends WindowPolicy {
-        private final Duration windowDuration;
-        private final Duration slidingInterval;
-
-        public SlidingWindowPolicy(Duration windowDuration, Duration slidingInterval) {
-            this.windowDuration = windowDuration;
-            this.slidingInterval = slidingInterval;
-        }
-    }
-
-    /**
-     * This policy specifies the tuples to be grouped in a window with {@link #windowDuration} and starts a new window once it reaches {@link #windowDuration}
-     */
-    public class TumblingWindowPolicy extends WindowPolicy {
-        private final Duration windowDuration;
-
-        public TumblingWindowPolicy(Duration windowDuration, Duration slidingInterval) {
-            this.windowDuration = windowDuration;
-        }
-    }
-
-    /**
-     * It specifies a window of {@link TridentTuple}
-     */
-    public interface TridentWindow extends Window<TridentTuple> {
-
-        /**
-         * @return returns the latest timestamp of the tuples containing in the window.
-         */
-        public long latestTimeStamp();
-    }
-
-    /**
-     * This class implements a policy to evict tuples in the given {@link TridentWindow}
-     */
-    public interface Evictor {
-
-        /**
-         * Specifies to evict all the elements in the window.
-         */
-        public static final Evictor ALL = new Evictor() {
-            @Override
-            public int evict(TridentWindow tridentWindow) {
-                return tridentWindow.get().size();
-            }
-        };
-
-        /**
-         * Specifies to evict none of the elements in the window.
-         */
-        public static final Evictor NONE = new Evictor() {
-            @Override
-            public int evict(TridentWindow tridentWindow) {
-                return 0;
-            }
-        };
-
-        /**
-         *
-         * @param tridentWindow window of tuples for which no of evicted elements to be computed.
-         * @return number of elements to be evicted from start
-         */
-        public int evict(TridentWindow tridentWindow);
-    }
-
-    /**
-     * This class implements
-     */
-    public interface Trigger {
-
-        /**
-         * {@code FIRE} represents whether to send the @{TridentWindow} for computing with the associated function.
-         * {@code SKIP} represents whether to skip and continue accumulating tuples.
-         * {@cide FINISH} represents whether this window is finished and it will slide or tumble to new window according to the {@WindowPolicy}
-         */
-        enum Action {FIRE, SKIP, FINISH}
-
-        /**
-         * Evaluates what {@link Action} to be taken after evaluating given event.
-         *
-         * @param tupleEvent
-         * @return returns Action whether to fire/skip/finish
-         */
-//        public Action evaluate(Event tupleEvent);
-    }
-
     /**
      * Returns a Stream which does windowing on incoming batches of tuples.
      *
@@ -355,7 +216,9 @@ public class Stream implements IAggregatableStream {
      * @return
      */
     public Stream window(WindowPolicy windowPolicy, Fields inputFields, Aggregator aggregator, Fields functionFields) {
-        return this;
+        WindowAggregator windowAggregator = new WindowAggregator(windowPolicy);
+        Stream stream = aggregate(new Fields(), windowAggregator, new Fields());
+        return stream.aggregate(inputFields, aggregator, functionFields);
     }
 
 

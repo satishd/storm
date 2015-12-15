@@ -1,4 +1,13 @@
 ## 0.11.0
+ * STORM-1387: workers-artifacts directory configurable, and default to be under storm.log.dir.
+ * STORM-1211: Add trident state and query support for cassandra connector
+ * STORM-1359: Change kryo links from google code to github
+ * STORM-1385: Divide by zero exception in stats.clj
+ * STORM-1370: Bug fixes for MultitenantScheduler
+ * STORM-1374: fix random failure on WindowManagerTest
+ * STORM-1040: SQL support for Storm.
+ * STORM-1364: Log storm version on daemon start
+ * STORM-1375: Blobstore broke Pacemaker
  * STORM-876: Blobstore/DistCache Support
  * STORM-1361: Apache License missing from two Cassandra files
  * STORM-756: Handle taskids response as soon as possible

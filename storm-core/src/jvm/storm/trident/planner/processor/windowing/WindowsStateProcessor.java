@@ -19,31 +19,25 @@
 package storm.trident.planner.processor.windowing;
 
 import backtype.storm.task.TopologyContext;
-import backtype.storm.topology.base.BaseWindowedBolt;
 import backtype.storm.tuple.Fields;
-import backtype.storm.windowing.CountEvictionPolicy;
-import backtype.storm.windowing.CountTriggerPolicy;
-import backtype.storm.windowing.WindowLifecycleListener;
-import backtype.storm.windowing.WindowManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import storm.trident.operation.Aggregator;
 import storm.trident.planner.ProcessorContext;
 import storm.trident.planner.TridentProcessor;
+import storm.trident.planner.processor.AggregateProcessor;
 import storm.trident.planner.processor.FreshCollector;
 import storm.trident.planner.processor.TridentContext;
 import storm.trident.tuple.TridentTuple;
 import storm.trident.tuple.TridentTupleView;
 
-import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  *
@@ -51,19 +45,21 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class WindowsStateProcessor implements TridentProcessor {
 
     private static final Logger log = LoggerFactory.getLogger(WindowsStateProcessor.class);
+    public static final int DEFAULT_TUMBLING_COUNT = 100;
 
-    private final BaseWindowedBolt.Count tumblingCount;
-    private final MapStore<byte[], Collection<TridentTuple>> _mapStore;
+    private final int tumblingCount;
+    private final MapStoreFactory<byte[], Collection<TridentTuple>> _mapStore;
     private final Fields _inputFields;
     private final Aggregator aggregator;
     private TridentContext _tridentContext;
     private FreshCollector _collector;
     private TridentTupleView.ProjectionFactory _projection;
+    private Map conf;
     private TopologyContext context;
     private int ct;
     private CombinedWindowState combinedWindowState;
 
-    public WindowsStateProcessor(BaseWindowedBolt.Count tumblingCount, MapStore mapStore, Fields inputFields, Aggregator aggregator) {
+    public WindowsStateProcessor(int tumblingCount, MapStoreFactory<byte[], Collection<TridentTuple>> mapStore, Fields inputFields, Aggregator aggregator) {
         this.tumblingCount = tumblingCount;
         _mapStore = mapStore;
         _inputFields = inputFields;
@@ -71,6 +67,7 @@ public class WindowsStateProcessor implements TridentProcessor {
     }
 
     public void prepare(Map conf, TopologyContext context, TridentContext tridentContext) {
+        this.conf = conf;
         this.context = context;
         List<TridentTuple.Factory> parents = tridentContext.getParentTupleFactories();
         if (parents.size() != 1) {
@@ -81,7 +78,7 @@ public class WindowsStateProcessor implements TridentProcessor {
         _projection = new TridentTupleView.ProjectionFactory(parents.get(0), _inputFields);
 //        _agg.prepare(conf, new TridentOperationContext(context, _projection));
         // windowing operations
-        combinedWindowState = new CombinedWindowState(tumblingCount, _collector, _mapStore, context, aggregator);
+        combinedWindowState = new CombinedWindowState(tumblingCount, _mapStore.create(), context);
 
         // create hbase client and connect to it. You can push required tuples in to state store.
     }
@@ -93,17 +90,17 @@ public class WindowsStateProcessor implements TridentProcessor {
     }
 
     static class WindowState {
-        private Object batchId;
-        private final Set<TridentTuple> tuples = new HashSet<>();
+        final Object batchId;
+        final Set<TridentTuple> tuples = Collections.newSetFromMap(new ConcurrentHashMap<TridentTuple, Boolean>());
 
         public WindowState(Object batchId) {
             this.batchId = batchId;
         }
     }
 
-    static class TridentBatchTuple {
-        private final Object batchId;
-        private final TridentTuple tuple;
+    public static class TridentBatchTuple {
+        final Object batchId;
+        final TridentTuple tuple;
 
         public TridentBatchTuple(Object batchId, TridentTuple tuple) {
             this.batchId = batchId;
@@ -111,149 +108,12 @@ public class WindowsStateProcessor implements TridentProcessor {
         }
     }
 
-    static class CombinedWindowState {
-        private final WindowManager<TridentBatchTuple> windowManager;
-        private Map<Object, WindowState> batchIdVsWindowState = new HashMap<>();
-        private final FreshCollector _collector;
-        private final MapStore<byte[], Collection<TridentTuple>> _mapStore;
-        private final TopologyContext context;
-        private final Aggregator aggregator;
-        private List<Object> finishedBatches = new ArrayList<>();
-        private AtomicInteger triggerId = new AtomicInteger();
-        private Map<Integer, Collection<TridentTuple>> triggers = new ConcurrentHashMap<>();
-
-        public CombinedWindowState(BaseWindowedBolt.Count tumblingCount, FreshCollector _collector, MapStore<byte[], Collection<TridentTuple>> _mapStore, TopologyContext context, Aggregator aggregator) {
-            this._collector = _collector;
-            this._mapStore = _mapStore;
-            this.context = context;
-            this.aggregator = aggregator;
-            WindowLifecycleListener<TridentBatchTuple> lifecycleListener = newLifeCycleListener();
-            windowManager = new WindowManager<>(lifecycleListener);
-
-            int count = tumblingCount != null ? tumblingCount.value : 100;
-
-            CountEvictionPolicy<TridentBatchTuple> timeEvictionPolicy = new CountEvictionPolicy<>(count);
-            windowManager.setEvictionPolicy(timeEvictionPolicy);
-            windowManager.setTriggerPolicy(new CountTriggerPolicy<>(count, windowManager, timeEvictionPolicy));
-        }
-
-        private WindowLifecycleListener<TridentBatchTuple> newLifeCycleListener() {
-            return new WindowLifecycleListener<TridentBatchTuple>() {
-                @Override
-                public void onExpiry(List<TridentBatchTuple> events) {
-                    log.debug("List of expired tuples: {}", events);
-                    // removing expired tuples form their respective batches
-                    updateStateWithExpiredTuples(events, true);
-                }
-
-                @Override
-                public void onActivation(List<TridentBatchTuple> events, List<TridentBatchTuple> newEvents, List<TridentBatchTuple> expired) {
-                    log.debug("Window is triggered, events size: {} ", events.size());
-                    // trigger occurred, update state and inmemory
-                    int curTriggerId = triggerId.incrementAndGet();
-                    storeTriggeredTuples(curTriggerId, events);
-
-                    // todo can we use aggregator and aggregate the result and store?
-
-                    // remove expired events from state
-                    Set<Object> removedBatches = updateStateWithExpiredTuples(expired, false);
-
-                    // update only newly added as expired events are already removed.
-                    Set<Object> updatedBatches = updateStateWithNewEvents(newEvents);
-                    updatedBatches.addAll(removedBatches);
-
-                    // store update batches
-                    updateBatchesInStore(updatedBatches);
-
-                }
-
-                private void storeTriggeredTuples(int curTriggerId, List<TridentBatchTuple> events) {
-                    List<TridentTuple> tuples = new ArrayList<>();
-                    for (TridentBatchTuple event : events) {
-                        tuples.add(event.tuple);
-                    }
-                    triggers.put(curTriggerId, tuples);
-                    _mapStore.put(("trigger:"+curTriggerId).getBytes(), tuples);
-                }
-
-                private Set<Object> updateStateWithNewEvents(List<TridentBatchTuple> newEvents) {
-                    Set<Object> batches = new HashSet<>();
-
-                    for (TridentBatchTuple newEvent : newEvents) {
-                        batches.add(newEvent.batchId);
-                        batchIdVsWindowState.get(newEvent.batchId).tuples.remove(newEvent.tuple);
-                    }
-
-                    return batches;
-                }
-
-                private Set<Object> updateStateWithExpiredTuples(List<TridentBatchTuple> expiredEvents, boolean updateStore) {
-                    Set<Object> batches = new HashSet<>();
-                    for (TridentBatchTuple event : expiredEvents) {
-                        batches.add(event.batchId);
-                        batchIdVsWindowState.get(event.batchId).tuples.remove(event.tuple);
-                    }
-                    // store modified batches
-                    if (updateStore) {
-                        updateBatchesInStore(batches);
-                    }
-
-                    return batches;
-                }
-
-                private void updateBatchesInStore(Set<Object> batches) {
-                    for (Object batchId : batches) {
-                        WindowState windowState = batchIdVsWindowState.get(batchId);
-                        _mapStore.put(keyOf(context, batchId), windowState.tuples);
-                    }
-                }
-
-            };
-        }
-
-        public WindowState initState(Object batchId) {
-            if (batchIdVsWindowState.containsKey(batchId)) {
-                throw new IllegalStateException("WindowState is already initialized");
-            }
-
-            WindowState windowState = new WindowState(batchId);
-            batchIdVsWindowState.put(batchId, windowState);
-            return windowState;
-        }
-
-        public boolean exists(Object batchId) {
-            WindowState windowState = batchIdVsWindowState.get(batchId);
-            return !(windowState == null || windowState.tuples.isEmpty());
-        }
-
-        public void addTupleToBatch(Object batchId, TridentTuple tuple) {
-            batchIdVsWindowState.get(batchId).tuples.add(tuple);
-            // check whether it can be triggered or not.
-            // remove window state tuples
-        }
-
-        public void addFinishedBatch(Object currentBatch) {
-            finishedBatches.add(currentBatch);
-            for (TridentTuple tuple : batchIdVsWindowState.get(currentBatch).tuples) {
-                windowManager.add(new TridentBatchTuple(currentBatch, tuple));
-            }
-        }
-
-        public void cleanup() {
-            windowManager.shutdown();
-        }
-
-        public Set<TridentTuple> getTuples(Object batchId) {
-            return batchIdVsWindowState.get(batchId).tuples;
-        }
-    }
-
-
     @Override
     public void startBatch(ProcessorContext processorContext) {
         _collector.setContext(processorContext);
 //        processorContext.state[_tridentContext.getStateIndex()] = _agg.init(processorContext.batchId, _collector);
-        processorContext.state[_tridentContext.getStateIndex()] = new WindowState(processorContext.batchId);
+        processorContext.state[_tridentContext.getStateIndex()] = combinedWindowState.initState(processorContext.batchId);
+        _collector.setContext(null);
     }
 
     @Override
@@ -273,16 +133,45 @@ public class WindowsStateProcessor implements TridentProcessor {
         Set<TridentTuple> tuples = combinedWindowState.getTuples(batchId);
 
         // before it returns from here, current state should be saved.
-
         // check whether the state exists in the combined window or not.
         if (tuples != null && !tuples.isEmpty()) {
             // save the state
             // todo batchId is unique for each stream, Right? Then we should add streamId as one of the keys in the map.
-            _mapStore.put(keyOf(context, batchId), tuples);
+            combinedWindowState.storeTuples(keyOf(context, batchId), tuples);
         }
+
+        // fire triggers if any
+        _collector.setContext(processorContext);
+        Map<Integer, Collection<TridentTuple>> triggers = combinedWindowState.triggers;
+
+        for (Map.Entry<Integer, Collection<TridentTuple>> entry : triggers.entrySet()) {
+            Collection<TridentTuple> tridentTuples = entry.getValue();
+            //todo this should have been an aggregated result instead of list of values
+            executeAggregator(processorContext, tridentTuples);
+        }
+        _collector.setContext(null);
+
+        // remove state if there are no elements in it.
+//        combinedWindowState.cleanExpiredBatches();
+
+        // clear once all triggers are run
+        triggers.clear();
+        // todo update in store also.
     }
 
-    private static byte[] keyOf(TopologyContext context, Object batchId) {
+    private void executeAggregator(ProcessorContext processorContext, Collection<TridentTuple> tridentTuples) {
+        AggregateProcessor aggregateProcessor = new AggregateProcessor(_inputFields, aggregator);
+        aggregateProcessor.prepare(conf, context, _tridentContext);
+        aggregateProcessor.startBatch(processorContext);
+
+        for (TridentTuple tridentTuple : tridentTuples) {
+            String streamId = null; // todo store and get this value
+            aggregateProcessor.execute(processorContext, streamId, tridentTuple);
+        }
+        aggregateProcessor.finishBatch(processorContext);
+    }
+
+    static byte[] keyOf(TopologyContext context, Object batchId) {
         String key = context.getThisComponentId()+":"+context.getThisTaskId()+":"+batchId;
         return key.getBytes();
     }

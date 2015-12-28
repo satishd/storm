@@ -19,10 +19,11 @@ package storm.trident;
 
 import backtype.storm.generated.Grouping;
 import backtype.storm.generated.NullStruct;
-import storm.trident.fluent.ChainedAggregatorDeclarer;
 import backtype.storm.grouping.CustomStreamGrouping;
+import backtype.storm.topology.base.BaseWindowedBolt;
 import backtype.storm.tuple.Fields;
 import backtype.storm.utils.Utils;
+import storm.trident.fluent.ChainedAggregatorDeclarer;
 import storm.trident.fluent.GlobalAggregationScheme;
 import storm.trident.fluent.GroupedStream;
 import storm.trident.fluent.IAggregatableStream;
@@ -35,8 +36,8 @@ import storm.trident.operation.ReducerAggregator;
 import storm.trident.operation.impl.CombinerAggStateUpdater;
 import storm.trident.operation.impl.FilterExecutor;
 import storm.trident.operation.impl.GlobalBatchToPartition;
-import storm.trident.operation.impl.ReducerAggStateUpdater;
 import storm.trident.operation.impl.IndexHashBatchToPartition;
+import storm.trident.operation.impl.ReducerAggStateUpdater;
 import storm.trident.operation.impl.SingleEmitAggregator.BatchToPartition;
 import storm.trident.operation.impl.TrueFilter;
 import storm.trident.partition.GlobalGrouping;
@@ -51,15 +52,16 @@ import storm.trident.planner.processor.EachProcessor;
 import storm.trident.planner.processor.PartitionPersistProcessor;
 import storm.trident.planner.processor.ProjectedProcessor;
 import storm.trident.planner.processor.StateQueryProcessor;
-import storm.trident.planner.processor.windowing.WindowsProcessor;
+import storm.trident.planner.processor.windowing.MapStoreFactory;
+import storm.trident.planner.processor.windowing.WindowsStateProcessor;
 import storm.trident.state.QueryFunction;
 import storm.trident.state.StateFactory;
 import storm.trident.state.StateSpec;
 import storm.trident.state.StateUpdater;
-import storm.trident.state.map.MapState;
+import storm.trident.tuple.TridentTuple;
 import storm.trident.util.TridentUtils;
 
-import java.time.Duration;
+import java.util.Collection;
 
 // TODO: need to be able to replace existing fields with the function fields (like Cascading Fields.REPLACE)
 public class Stream implements IAggregatableStream {
@@ -150,14 +152,15 @@ public class Stream implements IAggregatableStream {
                     new EachProcessor(inputFields, function)));
     }
 
-    public Stream tumblingWindow(Duration duration, MapState mapState, Fields inputFields, Aggregator aggregator, Fields functionFields) {
+    public Stream tumblingWindow(int count, MapStoreFactory<byte[], Collection<TridentTuple>> mapStore,
+                                 Fields inputFields, Aggregator aggregator, Fields functionFields) {
         projectionValidation(inputFields);
         return _topology.addSourcedNode(this,
                 new ProcessorNode(_topology.getUniqueStreamId(),
                         _name,
                         functionFields,
                         functionFields,
-                        new WindowsProcessor(duration, mapState, inputFields, aggregator)));
+                        new WindowsStateProcessor(count, mapStore, inputFields, aggregator)));
     }
 
     //creates brand new tuples with brand new fields

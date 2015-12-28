@@ -23,6 +23,7 @@ import backtype.storm.Config;
 import backtype.storm.LocalCluster;
 import backtype.storm.StormSubmitter;
 import backtype.storm.generated.StormTopology;
+import backtype.storm.topology.base.BaseWindowedBolt;
 import backtype.storm.tuple.Fields;
 import backtype.storm.tuple.Values;
 import storm.trident.Stream;
@@ -31,12 +32,16 @@ import storm.trident.operation.BaseFunction;
 import storm.trident.operation.TridentCollector;
 import storm.trident.operation.builtin.Count;
 import storm.trident.operation.builtin.Debug;
+import storm.trident.planner.processor.windowing.InmemoryMapStoreFactory;
+import storm.trident.planner.processor.windowing.MapStoreFactory;
 import storm.trident.planner.processor.windowing.WindowsStateProcessor;
 import storm.trident.state.map.MapState;
+import storm.trident.testing.CountAsAggregator;
 import storm.trident.testing.FixedBatchSpout;
 import storm.trident.tuple.TridentTuple;
 
 import java.time.Duration;
+import java.util.Collection;
 
 /**
  *
@@ -64,9 +69,13 @@ public class TridentWindowing {
 //                new Split(), new Fields("word")).groupBy(new Fields("word")).persistentAggregate(new MemoryMapState.Factory(),
 //                new Count(), new Fields("count")).parallelismHint(16);
 
-        MapState mapState = null;
+        MapStoreFactory<byte[], Collection<TridentTuple>> mapState = new InmemoryMapStoreFactory<>();
         Stream stream = topology.newStream("spout1", spout).parallelismHint(16).each(new Fields("sentence"),
-                new Split(), new Fields("word")).tumblingWindow(Duration.ofSeconds(10), mapState, new Fields("word"), null, new Fields("words")).aggregate(new Count(), new Fields("count")).each(new Fields("count"), new Debug());
+                new Split(), new Fields("word")).
+//                tumblingWindow(Duration.ofSeconds(10), mapState, new Fields("word"), null, new Fields("words"))
+                tumblingWindow(1000, mapState, new Fields("word"), new CountAsAggregator(), new Fields("count"))
+//                .aggregate(new Count(), new Fields("count"))
+                .each(new Fields("count"), new Debug());
 
         return topology.build();
     }

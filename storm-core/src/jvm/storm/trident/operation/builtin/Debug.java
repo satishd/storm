@@ -33,6 +33,10 @@ public class Debug extends BaseFilter {
 
     @Override
     public boolean isKeep(TridentTuple tuple) {
+        System.out.println("####### tuple = " + tuple.getValues().size());
+        for (Object value : tuple.getValues()) {
+            System.out.println("####### value = " + value);
+        }
         System.out.println(name + tuple.toString());
         return true;
     }

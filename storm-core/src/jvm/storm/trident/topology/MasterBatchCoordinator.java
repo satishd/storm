@@ -132,6 +132,13 @@ public class MasterBatchCoordinator extends BaseRichSpout {
         TransactionStatus status = _activeTx.get(tx.getTransactionId());
         if(status!=null && tx.equals(status.attempt)) {
             if(status.status==AttemptStatus.PROCESSING) {
+                // While creating topology, look whether any window based processors are there, then this class gets to
+                // know that it has to check below conditions.
+                // there will be a new state for windowing based streams so check for that.
+                // you may not want to set this for windowing and set this only when it comes back.
+                // look into zk and check whether there is window state set for this transaction. window processor can
+                // set the state before it returns from there in finish batch.
+                // This can be done with existing TransactionalState class.
                 status.status = AttemptStatus.PROCESSED;
             } else if(status.status==AttemptStatus.COMMITTING) {
                 _activeTx.remove(tx.getTransactionId());
@@ -139,7 +146,7 @@ public class MasterBatchCoordinator extends BaseRichSpout {
                 _collector.emit(SUCCESS_STREAM_ID, new Values(tx));
                 _currTransaction = nextTransactionId(tx.getTransactionId());
                 for(TransactionalState state: _states) {
-                    state.setData(CURRENT_TX, _currTransaction);                    
+                    state.setData(CURRENT_TX, _currTransaction);
                 }
             }
             sync();

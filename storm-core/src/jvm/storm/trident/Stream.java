@@ -51,11 +51,15 @@ import storm.trident.planner.processor.EachProcessor;
 import storm.trident.planner.processor.PartitionPersistProcessor;
 import storm.trident.planner.processor.ProjectedProcessor;
 import storm.trident.planner.processor.StateQueryProcessor;
+import storm.trident.planner.processor.windowing.WindowsProcessor;
 import storm.trident.state.QueryFunction;
 import storm.trident.state.StateFactory;
 import storm.trident.state.StateSpec;
 import storm.trident.state.StateUpdater;
+import storm.trident.state.map.MapState;
 import storm.trident.util.TridentUtils;
+
+import java.time.Duration;
 
 // TODO: need to be able to replace existing fields with the function fields (like Cascading Fields.REPLACE)
 public class Stream implements IAggregatableStream {
@@ -144,6 +148,16 @@ public class Stream implements IAggregatableStream {
                     TridentUtils.fieldsConcat(getOutputFields(), functionFields),
                     functionFields,
                     new EachProcessor(inputFields, function)));
+    }
+
+    public Stream tumblingWindow(Duration duration, MapState mapState, Fields inputFields, Aggregator aggregator, Fields functionFields) {
+        projectionValidation(inputFields);
+        return _topology.addSourcedNode(this,
+                new ProcessorNode(_topology.getUniqueStreamId(),
+                        _name,
+                        functionFields,
+                        functionFields,
+                        new WindowsProcessor(duration, mapState, inputFields, aggregator)));
     }
 
     //creates brand new tuples with brand new fields

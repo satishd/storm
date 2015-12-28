@@ -273,6 +273,11 @@ public class TridentBoltExecutor implements IRichBolt {
             return;
         }
         CoordCondition cond = tracked.condition;
+        // delayed ack is null when it receives coord stream, it acks but it does not invoke finishBatch because it
+        // supports commit protocol. So, it does not send all these tuples move forward to the next set of operators.
+        // this node waits for commit protocol to occur and then it calls finish batch on partition-persist. But the
+        // next set of operators can take values stream and tied with cord batch but it acks back
+        //
         boolean delayed = tracked.delayedAck==null &&
                               (cond.commitStream!=null && type==TupleType.COMMIT
                                || cond.commitStream==null);

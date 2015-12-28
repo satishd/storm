@@ -34,7 +34,10 @@ import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
+import org.apache.hadoop.hbase.client.ResultScanner;
 import org.apache.hadoop.hbase.client.RetriesExhaustedWithDetailsException;
+import org.apache.hadoop.hbase.client.Scan;
+import org.apache.hadoop.hbase.filter.PrefixFilter;
 import storm.trident.Stream;
 import storm.trident.TridentTopology;
 import storm.trident.operation.BaseFunction;
@@ -53,6 +56,9 @@ import java.io.InterruptedIOException;
 import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -166,6 +172,27 @@ public class TridentWindowing {
             Input input = new Input(result.getValue(family, qualifier));
             Collection tuples = kryo.readObject(input, Collection.class);
             return tuples;
+        }
+
+        @Override
+        public Collection<Collection<TridentTuple>> getWithPrefixKey(byte[] prefix) {
+            Scan scan = new Scan(prefix);
+            scan.setFilter(new PrefixFilter(prefix));
+            ResultScanner resultScanner = null;
+            try {
+                resultScanner = htable.getScanner(scan);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+            Iterator<Result> iterator = resultScanner.iterator();
+            Kryo kryo = new Kryo();
+            List<Collection<TridentTuple>> tuplesList = new LinkedList<>();
+            for (Result result : resultScanner) {
+                Input input = new Input(result.getValue(family, qualifier));
+                Collection tuples = kryo.readObject(input, Collection.class);
+                tuplesList.add(tuples);
+            }
+            return tuplesList;
         }
 
         @Override

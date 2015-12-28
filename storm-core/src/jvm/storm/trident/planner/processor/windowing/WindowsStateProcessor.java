@@ -49,7 +49,7 @@ public class WindowsStateProcessor implements TridentProcessor {
     public static final int DEFAULT_TUMBLING_COUNT = 100;
 
     private final int tumblingCount;
-    private final MapStoreFactory<byte[], Collection<TridentTuple>> _mapStore;
+    private final MapStoreFactory<byte[], Collection<TridentTuple>> _mapStoreFactory;
     private final Fields _inputFields;
     private final Aggregator aggregator;
     private TridentContext _tridentContext;
@@ -60,9 +60,9 @@ public class WindowsStateProcessor implements TridentProcessor {
     private int ct;
     private CombinedWindowState combinedWindowState;
 
-    public WindowsStateProcessor(int tumblingCount, MapStoreFactory<byte[], Collection<TridentTuple>> mapStore, Fields inputFields, Aggregator aggregator) {
+    public WindowsStateProcessor(int tumblingCount, MapStoreFactory<byte[], Collection<TridentTuple>> mapStoreFactory, Fields inputFields, Aggregator aggregator) {
         this.tumblingCount = tumblingCount;
-        _mapStore = mapStore;
+        _mapStoreFactory = mapStoreFactory;
         _inputFields = inputFields;
         this.aggregator = aggregator;
     }
@@ -79,9 +79,7 @@ public class WindowsStateProcessor implements TridentProcessor {
         _projection = new TridentTupleView.ProjectionFactory(parents.get(0), _inputFields);
 //        _agg.prepare(conf, new TridentOperationContext(context, _projection));
         // windowing operations
-        combinedWindowState = new CombinedWindowState(tumblingCount, _mapStore.create(), context);
-
-        // create hbase client and connect to it. You can push required tuples in to state store.
+        combinedWindowState = new CombinedWindowState(tumblingCount, _mapStoreFactory.create(), context);
     }
 
     @Override
@@ -164,6 +162,7 @@ public class WindowsStateProcessor implements TridentProcessor {
 
     private void executeAggregator(ProcessorContext processorContext, Collection<TridentTuple> tridentTuples) {
         AggregateProcessor aggregateProcessor = new AggregateProcessor(_inputFields, aggregator);
+        // todo is it safe to use processorContext and tridentContext of WindowsStateProcessor?
         aggregateProcessor.prepare(conf, context, _tridentContext);
         aggregateProcessor.startBatch(processorContext);
 
@@ -189,6 +188,11 @@ public class WindowsStateProcessor implements TridentProcessor {
         }
 
         @Override
+        public Collection<V> getWithPrefixKey(K k) {
+            throw new UnsupportedOperationException("partial-key get is not supported");
+        }
+
+        @Override
         public void put(K k, V v) {
             map.put(k, v);
         }
@@ -202,6 +206,7 @@ public class WindowsStateProcessor implements TridentProcessor {
 
     public static interface MapStore<K, V> {
         public V get(K k);
+        public Collection<V> getWithPrefixKey(K k);
         public void put(K k, V v);
         public boolean remove(K k);
     }

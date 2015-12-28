@@ -65,6 +65,19 @@ public class CombinedWindowState {
         CountEvictionPolicy<WindowsStateProcessor.TridentBatchTuple> timeEvictionPolicy = new CountEvictionPolicy<>(count);
         windowManager.setEvictionPolicy(timeEvictionPolicy);
         windowManager.setTriggerPolicy(new CountTriggerPolicy<>(count, windowManager, timeEvictionPolicy));
+
+        // todo get the state from mapStore if this task is restarted
+        // retrieve all tuples starting with
+        // byte[] scanKey = keyOf(context, "");
+        // from mapStore
+        Collection<Collection<TridentTuple>> tridentTuplesCollection = _mapStore.getWithPrefixKey(keyOf(context, ""));
+        for (Collection<TridentTuple> tridentTuples : tridentTuplesCollection) {
+            for (TridentTuple tridentTuple : tridentTuples) {
+                // todo get row key also to retrieve batchid
+                Object batchId = null;
+                windowManager.add(new WindowsStateProcessor.TridentBatchTuple(batchId, tridentTuple));
+            }
+        }
     }
 
     private WindowLifecycleListener<WindowsStateProcessor.TridentBatchTuple> newLifeCycleListener() {

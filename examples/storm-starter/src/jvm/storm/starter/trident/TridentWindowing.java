@@ -23,25 +23,37 @@ import backtype.storm.Config;
 import backtype.storm.LocalCluster;
 import backtype.storm.StormSubmitter;
 import backtype.storm.generated.StormTopology;
-import backtype.storm.topology.base.BaseWindowedBolt;
 import backtype.storm.tuple.Fields;
 import backtype.storm.tuple.Values;
+import com.esotericsoftware.kryo.Kryo;
+import com.esotericsoftware.kryo.io.Input;
+import com.esotericsoftware.kryo.io.Output;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.HBaseConfiguration;
+import org.apache.hadoop.hbase.client.Get;
+import org.apache.hadoop.hbase.client.HTable;
+import org.apache.hadoop.hbase.client.Put;
+import org.apache.hadoop.hbase.client.Result;
+import org.apache.hadoop.hbase.client.RetriesExhaustedWithDetailsException;
 import storm.trident.Stream;
 import storm.trident.TridentTopology;
 import storm.trident.operation.BaseFunction;
 import storm.trident.operation.TridentCollector;
-import storm.trident.operation.builtin.Count;
 import storm.trident.operation.builtin.Debug;
 import storm.trident.planner.processor.windowing.InmemoryMapStoreFactory;
 import storm.trident.planner.processor.windowing.MapStoreFactory;
 import storm.trident.planner.processor.windowing.WindowsStateProcessor;
-import storm.trident.state.map.MapState;
 import storm.trident.testing.CountAsAggregator;
 import storm.trident.testing.FixedBatchSpout;
 import storm.trident.tuple.TridentTuple;
 
-import java.time.Duration;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InterruptedIOException;
+import java.nio.ByteBuffer;
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  *
@@ -52,13 +64,13 @@ public class TridentWindowing {
         public void execute(TridentTuple tuple, TridentCollector collector) {
             String sentence = tuple.getString(0);
             for (String word : sentence.split(" ")) {
-                System.out.println("############ splitting..");
+//                System.out.println("############ splitting..");
                 collector.emit(new Values(word));
             }
         }
     }
 
-    public static StormTopology buildTopology() {
+    public static StormTopology buildTopology() throws Exception {
         FixedBatchSpout spout = new FixedBatchSpout(new Fields("sentence"), 3, new Values("the cow jumped over the moon"),
                 new Values("the man went to the store and bought some candy"), new Values("four score and seven years ago"),
                 new Values("how many apples can you eat"), new Values("to be or not to be the person"));
@@ -69,12 +81,14 @@ public class TridentWindowing {
 //                new Split(), new Fields("word")).groupBy(new Fields("word")).persistentAggregate(new MemoryMapState.Factory(),
 //                new Count(), new Fields("count")).parallelismHint(16);
 
-        MapStoreFactory<byte[], Collection<TridentTuple>> mapState = new InmemoryMapStoreFactory<>();
+//        MapStoreFactory<byte[], Collection<TridentTuple>> mapState = new InmemoryMapStoreFactory<>();
+        MapStoreFactory<byte[], Collection<TridentTuple>> mapState = new HBaseMapStoreFactory(new HashMap<String, Object>(), "window_state", "cf".getBytes("UTF-8"), "tuples".getBytes("UTF-8"));
         Stream stream = topology.newStream("spout1", spout).parallelismHint(16).each(new Fields("sentence"),
                 new Split(), new Fields("word")).
 //                tumblingWindow(Duration.ofSeconds(10), mapState, new Fields("word"), null, new Fields("words"))
                 tumblingWindow(1000, mapState, new Fields("word"), new CountAsAggregator(), new Fields("count"))
 //                .aggregate(new Count(), new Fields("count"))
+//                .aggregate(new Count(), new Fields("count-aggr"))
                 .each(new Fields("count"), new Debug());
 
         return topology.build();
@@ -97,26 +111,82 @@ public class TridentWindowing {
         }
     }
 
-    static class HBaseMapStore<K, V> implements WindowsStateProcessor.MapStore<K, V> {
+    static class HBaseMapStoreFactory implements MapStoreFactory<byte[], Collection<TridentTuple>> {
 
-        public HBaseMapStore() {
+        private final Map<String, Object> config;
+        private final String tableName;
+        private final byte[] family;
+        private final byte[] qualifier;
 
+        public HBaseMapStoreFactory(Map<String, Object> config, String tableName, byte[] family, byte[] qualifier) {
+            this.config = config;
+            this.tableName = tableName;
+            this.family = family;
+            this.qualifier = qualifier;
         }
 
         @Override
-        public V get(K k) {
-            return null;
+        public WindowsStateProcessor.MapStore<byte[], Collection<TridentTuple>> create() {
+            Configuration configuration = HBaseConfiguration.create();
+            for (Map.Entry<String, Object> entry : config.entrySet()) {
+                if(entry.getValue() != null) {
+                    configuration.set(entry.getKey(), entry.getValue().toString());
+                }
+            }
+            return new HBaseMapStore(configuration, tableName, family, qualifier);
+        }
+    }
+
+    static class HBaseMapStore implements WindowsStateProcessor.MapStore<byte[], Collection<TridentTuple>> {
+
+        private final HTable htable;
+        private byte[] family;
+        private byte[] qualifier;
+
+        public HBaseMapStore(Configuration config, String tableName, byte[] family, byte[] qualifier) {
+            this.family = family;
+            this.qualifier = qualifier;
+            try {
+                htable = new HTable(config, tableName);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
         }
 
         @Override
-        public void put(K k, V v) {
-
+        public Collection<TridentTuple> get(byte[] key) {
+            Get get = new Get(key);
+            Result result = null;
+            try {
+                result = htable.get(get);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+            Kryo kryo = new Kryo();
+            Input input = new Input(result.getValue(family, qualifier));
+            Collection tuples = kryo.readObject(input, Collection.class);
+            return tuples;
         }
 
         @Override
-        public boolean remove(K k) {
+        public void put(byte[] bytes, Collection<TridentTuple> tridentTuples) {
+            Put put = new Put(bytes, System.currentTimeMillis());
+            Kryo kryo = new Kryo();
+            Output output = new Output(new ByteArrayOutputStream());
+            kryo.writeObject(output, tridentTuples);
+            put.add(family, ByteBuffer.wrap(qualifier), System.currentTimeMillis(), ByteBuffer.wrap(output.getBuffer(), 0, output.position()));
+            try {
+                htable.put(put);
+            } catch (InterruptedIOException | RetriesExhaustedWithDetailsException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        @Override
+        public boolean remove(byte[] bytes) {
             return false;
         }
+
     }
 
 }

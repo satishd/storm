@@ -34,6 +34,7 @@ import storm.trident.tuple.TridentTupleView;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -137,7 +138,10 @@ public class WindowsStateProcessor implements TridentProcessor {
         if (tuples != null && !tuples.isEmpty()) {
             // save the state
             // todo batchId is unique for each stream, Right? Then we should add streamId as one of the keys in the map.
-            combinedWindowState.storeTuples(keyOf(context, batchId), tuples);
+            // kryo is not working fine with SetFromMap instance. building new list
+            LinkedList<TridentTuple> tridentTuples = new LinkedList<>();
+            tridentTuples.addAll(tuples);
+            combinedWindowState.storeTuples(batchId, tridentTuples);
         }
 
         // fire triggers if any
@@ -146,7 +150,6 @@ public class WindowsStateProcessor implements TridentProcessor {
 
         for (Map.Entry<Integer, Collection<TridentTuple>> entry : triggers.entrySet()) {
             Collection<TridentTuple> tridentTuples = entry.getValue();
-            //todo this should have been an aggregated result instead of list of values
             executeAggregator(processorContext, tridentTuples);
         }
         _collector.setContext(null);
@@ -169,11 +172,6 @@ public class WindowsStateProcessor implements TridentProcessor {
             aggregateProcessor.execute(processorContext, streamId, tridentTuple);
         }
         aggregateProcessor.finishBatch(processorContext);
-    }
-
-    static byte[] keyOf(TopologyContext context, Object batchId) {
-        String key = context.getThisComponentId()+":"+context.getThisTaskId()+":"+batchId;
-        return key.getBytes();
     }
 
     @Override

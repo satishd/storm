@@ -30,6 +30,7 @@ import storm.trident.tuple.TridentTuple;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -40,6 +41,8 @@ import java.util.concurrent.atomic.AtomicInteger;
  *
  */
 public class CombinedWindowState {
+    private static final String KEY_SEPARATOR = "|";
+
     private final WindowManager<WindowsStateProcessor.TridentBatchTuple> windowManager;
     private final Map<Object, WindowsStateProcessor.WindowState> batchIdVsWindowState = new ConcurrentHashMap<>();
     private final WindowsStateProcessor.MapStore<byte[], Collection<TridentTuple>> _mapStore;
@@ -79,8 +82,8 @@ public class CombinedWindowState {
                 // trigger occurred, update state and inmemory
                 int curTriggerId = triggerId.incrementAndGet();
                 storeTriggeredTuples(curTriggerId, events);
-
                 // todo can we use aggregator and aggregate the result and store?
+
 
                 // remove expired events from state
                 Set<Object> removedBatches = updateStateWithExpiredTuples(expired, false);
@@ -96,12 +99,13 @@ public class CombinedWindowState {
             }
 
             private void storeTriggeredTuples(int curTriggerId, List<WindowsStateProcessor.TridentBatchTuple> events) {
-                List<TridentTuple> tuples = new ArrayList<>();
+                List<TridentTuple> tuples = new LinkedList<>();
                 for (WindowsStateProcessor.TridentBatchTuple event : events) {
                     tuples.add(event.tuple);
                 }
                 triggers.put(curTriggerId, tuples);
-                _mapStore.put(("trigger:" + curTriggerId).getBytes(), tuples);
+                //todo should we store triggers also in store? These are fired only when next finish batch is invoked.
+                storeTuples("trigger|" + curTriggerId, tuples);
             }
 
             private Set<Object> updateStateWithNewEvents(List<WindowsStateProcessor.TridentBatchTuple> newEvents) {
@@ -134,7 +138,7 @@ public class CombinedWindowState {
                 for (Object batchId : batches) {
                     WindowsStateProcessor.WindowState windowState = batchIdVsWindowState.get(batchId);
                     if(windowState != null) {
-                        _mapStore.put(WindowsStateProcessor.keyOf(context, batchId), windowState.tuples);
+                        storeTuples(batchId, windowState.tuples);
                     }
                 }
             }
@@ -175,7 +179,12 @@ public class CombinedWindowState {
     }
 
     public void storeTuples(Object batchId, Collection<TridentTuple> tuples) {
-        _mapStore.put(WindowsStateProcessor.keyOf(context, batchId), tuples);
+        _mapStore.put(keyOf(context, batchId), tuples);
+    }
+
+    static byte[] keyOf(TopologyContext context, Object suffixKey) {
+        String key = context.getThisComponentId()+KEY_SEPARATOR+context.getThisTaskId()+ KEY_SEPARATOR +suffixKey;
+        return key.getBytes();
     }
 
     public void cleanExpiredBatches() {

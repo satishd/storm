@@ -57,8 +57,12 @@ public class WindowsStateProcessor implements TridentProcessor {
     private TridentTupleView.ProjectionFactory _projection;
     private Map conf;
     private TopologyContext context;
-    private int ct;
     private CombinedWindowState combinedWindowState;
+
+    private int executedTriggerCount;
+    private long startTime;
+    private int batchCount;
+    private long lastBatchExecTime;
 
     public WindowsStateProcessor(int tumblingCount, MapStoreFactory<byte[], Collection<TridentTuple>> mapStoreFactory, Fields inputFields, Aggregator aggregator) {
         this.tumblingCount = tumblingCount;
@@ -80,12 +84,12 @@ public class WindowsStateProcessor implements TridentProcessor {
 //        _agg.prepare(conf, new TridentOperationContext(context, _projection));
         // windowing operations
         combinedWindowState = new CombinedWindowState(tumblingCount, _mapStoreFactory.create(), context);
+        startTime = System.currentTimeMillis();
     }
 
     @Override
     public void cleanup() {
-//        _agg.cleanup();
-//        combinedWindowState.cleanup();
+        combinedWindowState.cleanup();
     }
 
     static class WindowState {
@@ -110,7 +114,6 @@ public class WindowsStateProcessor implements TridentProcessor {
     @Override
     public void startBatch(ProcessorContext processorContext) {
         _collector.setContext(processorContext);
-//        processorContext.state[_tridentContext.getStateIndex()] = _agg.init(processorContext.batchId, _collector);
         processorContext.state[_tridentContext.getStateIndex()] = combinedWindowState.initState(processorContext.batchId);
         _collector.setContext(null);
     }
@@ -122,10 +125,10 @@ public class WindowsStateProcessor implements TridentProcessor {
 
     @Override
     public void finishBatch(ProcessorContext processorContext) {
-//        _collector.setContext(processorContext);
-//        _agg.complete(processorContext.state[_tridentContext.getStateIndex()], _collector);
         Object batchId = processorContext.batchId;
-        System.out.println("##########WindowsProcessor.finishBatch: "+batchId);
+        if((batchCount++ % 100) == 0) {
+            System.out.println("##########WindowsProcessor.finishBatch: " + batchId +"\t batchCount: "+batchCount);
+        }
 
         // this would also add those tuples to the window.
         combinedWindowState.addFinishedBatch(batchId);
@@ -151,6 +154,15 @@ public class WindowsStateProcessor implements TridentProcessor {
             executeAggregator(processorContext, tridentTuples);
         }
         _collector.setContext(null);
+
+        executedTriggerCount += triggers.size();
+        long finishBatchTime = System.currentTimeMillis();
+        long execTime = (finishBatchTime - startTime)/1000;
+        if(executedTriggerCount > 0 && (finishBatchTime - lastBatchExecTime) > 10000) {
+            long triggerRate = execTime/executedTriggerCount;
+            System.out.println("############ duration: "+ (execTime)+" secs\t trigger-rate: "+triggerRate +" secs per trigger\t completed-trigger-count: "+executedTriggerCount);
+            lastBatchExecTime = finishBatchTime;
+        }
 
         // remove state if there are no elements in it.
 //        combinedWindowState.cleanExpiredBatches();
@@ -189,7 +201,9 @@ public class WindowsStateProcessor implements TridentProcessor {
 
         @Override
         public Collection<V> getWithPrefixKey(K k) {
-            throw new UnsupportedOperationException("partial-key get is not supported");
+            System.out.println("############ partial-key get is not supported");
+            return new LinkedList<>();
+//            throw new UnsupportedOperationException("partial-key get is not supported");
         }
 
         @Override

@@ -76,7 +76,7 @@ public class TridentWindowing {
         }
     }
 
-    public static StormTopology buildTopology() throws Exception {
+    public static StormTopology buildTopology(MapStoreFactory<byte[], Collection<TridentTuple>> mapState) throws Exception {
         FixedBatchSpout spout = new FixedBatchSpout(new Fields("sentence"), 3, new Values("the cow jumped over the moon"),
                 new Values("the man went to the store and bought some candy"), new Values("four score and seven years ago"),
                 new Values("how many apples can you eat"), new Values("to be or not to be the person"));
@@ -87,8 +87,6 @@ public class TridentWindowing {
 //                new Split(), new Fields("word")).groupBy(new Fields("word")).persistentAggregate(new MemoryMapState.Factory(),
 //                new Count(), new Fields("count")).parallelismHint(16);
 
-//        MapStoreFactory<byte[], Collection<TridentTuple>> mapState = new InmemoryMapStoreFactory<>();
-        MapStoreFactory<byte[], Collection<TridentTuple>> mapState = new HBaseMapStoreFactory(new HashMap<String, Object>(), "window_state", "cf".getBytes("UTF-8"), "tuples".getBytes("UTF-8"));
         Stream stream = topology.newStream("spout1", spout).parallelismHint(16).each(new Fields("sentence"),
                 new Split(), new Fields("word")).
 //                tumblingWindow(Duration.ofSeconds(10), mapState, new Fields("word"), null, new Fields("words"))
@@ -103,17 +101,23 @@ public class TridentWindowing {
     public static void main(String[] args) throws Exception {
         Config conf = new Config();
         conf.setMaxSpoutPending(20);
+        boolean useHbaseStore = Boolean.getBoolean("window.store.useHBase");
+        System.out.println("####### useHbaseStore = " + useHbaseStore);
+        MapStoreFactory<byte[], Collection<TridentTuple>> mapState = null;
+        if(!useHbaseStore) {
+            System.out.println("############ Using inmemory store..");
+            mapState = new InmemoryMapStoreFactory<>();
+        } else {
+            System.out.println("############ Using HBase map store..");
+            mapState = new HBaseMapStoreFactory(new HashMap<String, Object>(), "window_state", "cf".getBytes("UTF-8"), "tuples".getBytes("UTF-8"));
+        }
+
         if (args.length == 0) {
-//            LocalDRPC drpc = new LocalDRPC();
             LocalCluster cluster = new LocalCluster();
-            cluster.submitTopology("wordCounter", conf, buildTopology());
-            for (int i = 0; i < 100; i++) {
-//                System.out.println("DRPC RESULT: " + drpc.execute("words", "cat the dog jumped"));
-                Thread.sleep(1000);
-            }
+            cluster.submitTopology("wordCounter", conf, buildTopology(mapState));
         } else {
             conf.setNumWorkers(3);
-            StormSubmitter.submitTopologyWithProgressBar(args[0], conf, buildTopology());
+            StormSubmitter.submitTopologyWithProgressBar(args[0], conf, buildTopology(mapState));
         }
     }
 

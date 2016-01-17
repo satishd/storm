@@ -19,10 +19,8 @@ package org.apache.storm.trident;
 
 import org.apache.storm.generated.Grouping;
 import org.apache.storm.generated.NullStruct;
-import org.apache.storm.trident.fluent.ChainedAggregatorDeclarer;
 import org.apache.storm.grouping.CustomStreamGrouping;
-import org.apache.storm.tuple.Fields;
-import org.apache.storm.utils.Utils;
+import org.apache.storm.trident.fluent.ChainedAggregatorDeclarer;
 import org.apache.storm.trident.fluent.GlobalAggregationScheme;
 import org.apache.storm.trident.fluent.GroupedStream;
 import org.apache.storm.trident.fluent.IAggregatableStream;
@@ -35,8 +33,8 @@ import org.apache.storm.trident.operation.ReducerAggregator;
 import org.apache.storm.trident.operation.impl.CombinerAggStateUpdater;
 import org.apache.storm.trident.operation.impl.FilterExecutor;
 import org.apache.storm.trident.operation.impl.GlobalBatchToPartition;
-import org.apache.storm.trident.operation.impl.ReducerAggStateUpdater;
 import org.apache.storm.trident.operation.impl.IndexHashBatchToPartition;
+import org.apache.storm.trident.operation.impl.ReducerAggStateUpdater;
 import org.apache.storm.trident.operation.impl.SingleEmitAggregator.BatchToPartition;
 import org.apache.storm.trident.operation.impl.TrueFilter;
 import org.apache.storm.trident.partition.GlobalGrouping;
@@ -56,6 +54,15 @@ import org.apache.storm.trident.state.StateFactory;
 import org.apache.storm.trident.state.StateSpec;
 import org.apache.storm.trident.state.StateUpdater;
 import org.apache.storm.trident.util.TridentUtils;
+import org.apache.storm.trident.windowing.WindowTridentProcessor;
+import org.apache.storm.trident.windowing.WindowsStateFactory;
+import org.apache.storm.trident.windowing.WindowsStateUpdater;
+import org.apache.storm.trident.windowing.WindowsStoreFactory;
+import org.apache.storm.tuple.Fields;
+import org.apache.storm.utils.Utils;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * A Stream represents the core data model in Trident, and can be thought of as a "stream" of tuples that are processed
@@ -74,12 +81,13 @@ import org.apache.storm.trident.util.TridentUtils;
  * 5. **Merge and Join Operations** - Operations that combine different streams together.
  *
  */
+
 // TODO: need to be able to replace existing fields with the function fields (like Cascading Fields.REPLACE)
 public class Stream implements IAggregatableStream {
-    Node _node;
-    TridentTopology _topology;
-    String _name;
-    
+    final Node _node;
+    final String _name;
+    private final TridentTopology _topology;
+
     protected Stream(TridentTopology topology, String name, Node node) {
         _topology = topology;
         _node = node;
@@ -293,7 +301,7 @@ public class Stream implements IAggregatableStream {
     }
     
     public TridentState partitionPersist(StateFactory stateFactory, Fields inputFields, StateUpdater updater, Fields functionFields) {
-      return partitionPersist(new StateSpec(stateFactory), inputFields, updater, functionFields);
+        return partitionPersist(new StateSpec(stateFactory), inputFields, updater, functionFields);
     }
     
     public TridentState partitionPersist(StateSpec stateSpec, Fields inputFields, StateUpdater updater, Fields functionFields) {
@@ -314,7 +322,7 @@ public class Stream implements IAggregatableStream {
     }
     
     public TridentState partitionPersist(StateSpec stateSpec, Fields inputFields, StateUpdater updater) {
-      return partitionPersist(stateSpec, inputFields, updater, new Fields());        
+        return partitionPersist(stateSpec, inputFields, updater, new Fields());
     }
     
     public Stream each(Function function, Fields functionFields) {
@@ -387,7 +395,48 @@ public class Stream implements IAggregatableStream {
                 .aggregate(inputFields, agg, functionFields)
                 .chainEnd();
     }
-    
+
+    /**
+     * Returns stream which does tumbling window with every count of tuples.
+     *
+     * @param count represents no of tuples at which window tumbles
+     * @param windowStoreFactory intermediary tuple store for storing tuples for windowing
+     * @param inputFields input fields
+     * @param aggregator aggregator to run on the window of tuples to compute the result and emit to the stream.
+     * @param functionFields fields of values to emit with aggregation.
+     *
+     * @return
+     */
+    public Stream tumblingWindow(int count, WindowsStoreFactory windowStoreFactory,
+                                 Fields inputFields, Aggregator aggregator, Fields functionFields) {
+        projectionValidation(inputFields);
+        Fields fields = addTriggerField(functionFields);
+        Stream stream = _topology.addSourcedNode(this,
+                new ProcessorNode(_topology.getUniqueStreamId(),
+                        _name,
+                        fields,
+                        fields,
+                        new WindowTridentProcessor(count, _topology.getUniqueWindowId(), windowStoreFactory, inputFields, aggregator)));
+        Stream effectiveStream = stream.project(functionFields);
+
+        // create wrappers for StateFactory and StateUpdater with the given windowStoreFactory to remove trigger results
+        // when they are successfully processed.
+        StateFactory stateFactory = new WindowsStateFactory();
+        StateUpdater stateUpdater = new WindowsStateUpdater(windowStoreFactory);
+        stream.partitionPersist(stateFactory, new Fields(WindowTridentProcessor.TRIGGER_FIELD_NAME), stateUpdater, new Fields());
+
+        return effectiveStream;
+    }
+
+    private Fields addTriggerField(Fields functionFields) {
+        List<String> fieldsList = new ArrayList<>();
+        fieldsList.add(WindowTridentProcessor.TRIGGER_FIELD_NAME);
+        for (String field : functionFields) {
+            fieldsList.add(field);
+        }
+        return new Fields(fieldsList);
+    }
+
     public TridentState partitionPersist(StateFactory stateFactory, StateUpdater updater, Fields functionFields) {
         return partitionPersist(new StateSpec(stateFactory), updater, functionFields);
     }

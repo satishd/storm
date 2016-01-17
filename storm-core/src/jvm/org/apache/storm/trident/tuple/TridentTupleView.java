@@ -209,7 +209,7 @@ public class TridentTupleView extends AbstractList<Object> implements TridentTup
         _index = index;
         _fieldIndex = fieldIndex;
     }
-
+    
     public static TridentTuple createFreshTuple(Fields fields, List<Object> values) {
         FreshOutputFactory factory = new FreshOutputFactory(fields);
         return factory.create(values);

@@ -23,8 +23,13 @@ import org.apache.storm.trident.operation.Aggregator;
 import org.apache.storm.trident.operation.TridentCollector;
 import org.apache.storm.trident.spout.IBatchID;
 import org.apache.storm.trident.tuple.TridentTuple;
+import org.apache.storm.trident.windowing.config.WindowConfig;
+import org.apache.storm.trident.windowing.strategy.WindowStrategy;
+import org.apache.storm.trident.windowing.strategy.WindowStrategyFactory;
 import org.apache.storm.windowing.CountEvictionPolicy;
 import org.apache.storm.windowing.CountTriggerPolicy;
+import org.apache.storm.windowing.EvictionPolicy;
+import org.apache.storm.windowing.TriggerPolicy;
 import org.apache.storm.windowing.WindowLifecycleListener;
 import org.apache.storm.windowing.WindowManager;
 import org.slf4j.Logger;
@@ -32,7 +37,6 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
@@ -74,6 +78,23 @@ public class TridentWindowManager {
         CountEvictionPolicy<TridentBatchTuple> timeEvictionPolicy = new CountEvictionPolicy<>(count);
         windowManager.setEvictionPolicy(timeEvictionPolicy);
         windowManager.setTriggerPolicy(new CountTriggerPolicy<>(count, windowManager, timeEvictionPolicy));
+    }
+
+    public TridentWindowManager(WindowConfig windowConfig, String windowTaskId, WindowsStore windowStore, Aggregator aggregator, BatchOutputCollector delegateCollector) {
+        this.windowStore = windowStore;
+        this.aggregator = aggregator;
+        this.delegateCollector = delegateCollector;
+
+        windowTriggerTaskId = TRIGGER_PREFIX + windowTaskId;
+        windowTupleTaskId = TUPLE_PREFIX + windowTaskId;
+        windowManager = new WindowManager<>(new TridentWindowLifeCycleListener());
+
+        WindowStrategyFactory windowStrategyFactory = new WindowStrategyFactory();
+        WindowStrategy windowStrategy = windowStrategyFactory.create(windowConfig);
+        EvictionPolicy<TridentBatchTuple> evictionPolicy = windowStrategy.getEvictionPolicy();
+        windowManager.setEvictionPolicy(evictionPolicy);
+        TriggerPolicy<TridentBatchTuple> triggerPolicy = windowStrategy.getTriggerPolicy(windowManager, evictionPolicy);
+        windowManager.setTriggerPolicy(triggerPolicy);
     }
 
     public void prepare() {
@@ -150,7 +171,8 @@ public class TridentWindowManager {
 
         @Override
         public void onActivation(List<TridentBatchTuple> events, List<TridentBatchTuple> newEvents, List<TridentBatchTuple> expired) {
-            log.debug("onActivation is invoked with events size: {}", events.size());
+            // todo-sato change it to debug
+            log.error("onActivation is invoked with events size: {}", events.size());
             // trigger occurred, create an aggregation and keep them in store and remove expired tuples from store
             int currentTriggerId = triggerId.incrementAndGet();
             execAggregatorAndStoreResult(currentTriggerId, events);

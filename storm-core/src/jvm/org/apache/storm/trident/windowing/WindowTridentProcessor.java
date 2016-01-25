@@ -27,6 +27,8 @@ import org.apache.storm.trident.planner.processor.TridentContext;
 import org.apache.storm.trident.tuple.ConsList;
 import org.apache.storm.trident.tuple.TridentTuple;
 import org.apache.storm.trident.tuple.TridentTupleView;
+import org.apache.storm.trident.windowing.config.SlidingCountWindow;
+import org.apache.storm.trident.windowing.config.WindowConfig;
 import org.apache.storm.tuple.Fields;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,11 +48,12 @@ public class WindowTridentProcessor implements TridentProcessor {
     public static final String TRIGGER_FIELD_NAME = "_task_info";
     static final String KEY_SEPARATOR = "|";
 
-    private final int tumblingCount;
+    private int tumblingCount;
     private final String windowId;
     private final WindowsStoreFactory windowStoreFactory;
     private final Fields inputFields;
     private final Aggregator aggregator;
+    private WindowConfig windowConfig;
     private Map conf;
     private TopologyContext topologyContext;
     private FreshCollector collector;
@@ -59,9 +62,10 @@ public class WindowTridentProcessor implements TridentProcessor {
     private TridentContext tridentContext;
     private TridentWindowManager tridentWindowManager;
 
-    public WindowTridentProcessor(int count, String uniqueWindowId, WindowsStoreFactory windowStoreFactory,
-                                  Fields inputFields, Aggregator aggregator) {
-        tumblingCount = count;
+    public WindowTridentProcessor(WindowConfig windowConfig, String uniqueWindowId,
+                                  WindowsStoreFactory windowStoreFactory, Fields inputFields, Aggregator aggregator) {
+
+        this.windowConfig = windowConfig;
         windowId = uniqueWindowId;
         this.windowStoreFactory = windowStoreFactory;
         this.inputFields = inputFields;
@@ -80,7 +84,13 @@ public class WindowTridentProcessor implements TridentProcessor {
         collector = new FreshCollector(tridentContext);
         projection = new TridentTupleView.ProjectionFactory(parents.get(0), inputFields);
         String windowTaskId = windowId + KEY_SEPARATOR + topologyContext.getThisTaskId() + KEY_SEPARATOR;
-        tridentWindowManager = new TridentWindowManager(tumblingCount, windowTaskId, windowStoreFactory.create(windowTaskId), aggregator, tridentContext.getDelegateCollector());
+        // todo create window-manager based on windowing strategy (tumbling/slide w.r.t count/time)
+        tridentWindowManager = null;
+        if(tumblingCount > 0) {
+            tridentWindowManager = new TridentWindowManager(tumblingCount, windowTaskId, windowStoreFactory.create(windowTaskId), aggregator, tridentContext.getDelegateCollector());
+        } else {
+            tridentWindowManager = new TridentWindowManager(windowConfig, windowTaskId, windowStoreFactory.create(windowTaskId), aggregator, tridentContext.getDelegateCollector());
+        }
 //        startTime = System.currentTimeMillis();
     }
 

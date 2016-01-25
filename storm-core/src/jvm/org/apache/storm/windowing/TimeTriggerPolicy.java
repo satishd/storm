@@ -47,6 +47,7 @@ public class TimeTriggerPolicy<T> implements TriggerPolicy<T> {
         this.duration = millis;
         this.handler = handler;
         this.executor = Executors.newSingleThreadScheduledExecutor();
+        System.out.println("##########TimeTriggerPolicy.TimeTriggerPolicy with delay"+duration);
         this.executorFuture = executor.scheduleAtFixedRate(newTriggerTask(), duration, duration, TimeUnit.MILLISECONDS);
         this.evictionPolicy = evictionPolicy;
     }

@@ -22,6 +22,7 @@ import org.apache.storm.Config;
 import org.apache.storm.LocalCluster;
 import org.apache.storm.StormSubmitter;
 import org.apache.storm.generated.StormTopology;
+import org.apache.storm.topology.base.BaseWindowedBolt;
 import org.apache.storm.trident.Stream;
 import org.apache.storm.trident.TridentTopology;
 import org.apache.storm.trident.operation.BaseAggregator;
@@ -35,38 +36,49 @@ import org.apache.storm.trident.testing.FixedBatchSpout;
 import org.apache.storm.trident.tuple.TridentTuple;
 import org.apache.storm.trident.windowing.InMemoryWindowsStoreFactory;
 import org.apache.storm.trident.windowing.WindowsStoreFactory;
+import org.apache.storm.trident.windowing.config.SlidingCountWindow;
+import org.apache.storm.trident.windowing.config.SlidingDurationWindow;
+import org.apache.storm.trident.windowing.config.TumblingCountWindow;
+import org.apache.storm.trident.windowing.config.TumblingDurationWindow;
+import org.apache.storm.trident.windowing.config.WindowConfig;
 import org.apache.storm.tuple.Fields;
 import org.apache.storm.tuple.Values;
 import org.apache.storm.utils.Utils;
 
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 /**
  *
  */
 public class TridentWindowingInmemoryStoreTopology {
 
-    public static StormTopology buildTopology(WindowsStoreFactory mapState) throws Exception {
+    public static StormTopology buildTopology(WindowsStoreFactory mapState, WindowConfig windowConfig) throws Exception {
         FixedBatchSpout spout = new FixedBatchSpout(new Fields("sentence"), 3, new Values("the cow jumped over the moon"),
                 new Values("the man went to the store and bought some candy"), new Values("four score and seven years ago"),
                 new Values("how many apples can you eat"), new Values("to be or not to be the person"));
         spout.setCycle(true);
 
         TridentTopology topology = new TridentTopology();
-//        TridentState wordCounts = topology.newStream("spout1", spout).parallelismHint(16).each(new Fields("sentence"),
-//                new Split(), new Fields("word")).groupBy(new Fields("word")).persistentAggregate(new MemoryMapState.Factory(),
-//                new Count(), new Fields("count")).parallelismHint(16);
 
         Stream stream = topology.newStream("spout1", spout).parallelismHint(16).each(new Fields("sentence"),
-                new Split(), new Fields("word")).
+                new Split(), new Fields("word"))
 //                tumblingWindow(Duration.ofSeconds(10), mapState, new Fields("word"), null, new Fields("words"))
-        tumblingWindow(1000, mapState, new Fields("word"), new CountAsAggregator(), new Fields("count")).parallelismHint(2)
+//        .tumblingCountWindow(1000, mapState, new Fields("word"), new CountAsAggregator(), new Fields("count")).parallelismHint(2)
+//                        .window(new SlidingCountWindow(1000, 100), mapState, new Fields("word"), new CountAsAggregator(), new Fields("count"))
+//                        .window(new TumblingCountWindow(100), mapState, new Fields("word"), new CountAsAggregator(), new Fields("count"))
+//                        .window(new TumblingDurationWindow(new BaseWindowedBolt.Duration(5, TimeUnit.SECONDS)),
+//                                mapState, new Fields("word"), new CountAsAggregator(), new Fields("count"))
+                        .window(windowConfig, mapState, new Fields("word"), new CountAsAggregator(), new Fields("count"))
 //        tumblingWindow(100, mapState, new Fields("word"), new EchoAggregator(), new Fields("count"))
 //                .aggregate(new Fields("count"), new Count(), new Fields("count-p"))
 //                .aggregate(new Fields("count-p"), new Count(), new Fields("count-aggr"))
                 .each(new Fields("count"), new Debug())
                 .each(new Fields("count"), new Echo(), new Fields("ct"))
-                .each(new Fields("ct"), new Debug());
+                .each(new Fields("ct"), new Debug())
+                ;
 
         return topology.build();
     }
@@ -76,7 +88,6 @@ public class TridentWindowingInmemoryStoreTopology {
         public void execute(TridentTuple tuple, TridentCollector collector) {
             String sentence = tuple.getString(0);
             for (String word : sentence.split(" ")) {
-//                System.out.println("############ splitting..");
                 collector.emit(new Values(word));
             }
         }
@@ -130,14 +141,19 @@ public class TridentWindowingInmemoryStoreTopology {
         System.out.println("############ Using inmemory store..");
 
         if (args.length == 0) {
-            LocalCluster cluster = new LocalCluster();
-            cluster.submitTopology("wordCounter", conf, buildTopology(mapState));
-            Utils.sleep(60 * 1000);
-            cluster.shutdown();
-            System.exit(1);
+            List<? extends WindowConfig> list = Arrays.asList(SlidingCountWindow.of(1000, 100), TumblingCountWindow.of(1000),
+                    SlidingDurationWindow.of(new BaseWindowedBolt.Duration(6, TimeUnit.SECONDS), new BaseWindowedBolt.Duration(3, TimeUnit.SECONDS)),
+                    TumblingDurationWindow.of(new BaseWindowedBolt.Duration(5, TimeUnit.SECONDS)));
+            for (WindowConfig windowConfig : list) {
+                LocalCluster cluster = new LocalCluster();
+                cluster.submitTopology("wordCounter", conf, buildTopology(mapState, windowConfig));
+                Utils.sleep(60 * 1000);
+                cluster.shutdown();
+            }
+//            System.exit(1);
         } else {
             conf.setNumWorkers(3);
-            StormSubmitter.submitTopologyWithProgressBar(args[0], conf, buildTopology(mapState));
+            StormSubmitter.submitTopologyWithProgressBar(args[0], conf, buildTopology(mapState, SlidingCountWindow.of(1000, 100)));
         }
     }
 

@@ -34,6 +34,7 @@ import org.apache.storm.trident.testing.CountAsAggregator;
 import org.apache.storm.trident.testing.FixedBatchSpout;
 import org.apache.storm.trident.tuple.TridentTuple;
 import org.apache.storm.trident.windowing.WindowsStoreFactory;
+import org.apache.storm.trident.windowing.config.TumblingCountWindow;
 import org.apache.storm.tuple.Fields;
 import org.apache.storm.tuple.Values;
 import org.apache.storm.utils.Utils;
@@ -58,10 +59,8 @@ public class TridentHBaseWindowingStoreTopology {
 //                new Count(), new Fields("count")).parallelismHint(16);
 
         Stream stream = topology.newStream("spout1", spout).parallelismHint(16).each(new Fields("sentence"),
-                new Split(), new Fields("word")).
-//                tumblingWindow(Duration.ofSeconds(10), mapState, new Fields("word"), null, new Fields("words"))
-        tumblingWindow(1000, mapState, new Fields("word"), new CountAsAggregator(), new Fields("count")).parallelismHint(2)
-//        tumblingWindow(100, mapState, new Fields("word"), new EchoAggregator(), new Fields("count"))
+                new Split(), new Fields("word"))
+                .window(TumblingCountWindow.of(100), mapState, new Fields("word"), new CountAsAggregator(), new Fields("count"))
 //                .aggregate(new Fields("count"), new Count(), new Fields("count-p"))
 //                .aggregate(new Fields("count-p"), new Count(), new Fields("count-aggr"))
                 .each(new Fields("count"), new Debug())

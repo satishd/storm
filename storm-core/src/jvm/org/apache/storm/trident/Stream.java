@@ -20,6 +20,7 @@ package org.apache.storm.trident;
 import org.apache.storm.generated.Grouping;
 import org.apache.storm.generated.NullStruct;
 import org.apache.storm.grouping.CustomStreamGrouping;
+import org.apache.storm.topology.base.BaseWindowedBolt;
 import org.apache.storm.trident.fluent.ChainedAggregatorDeclarer;
 import org.apache.storm.trident.fluent.GlobalAggregationScheme;
 import org.apache.storm.trident.fluent.GroupedStream;
@@ -58,6 +59,11 @@ import org.apache.storm.trident.windowing.WindowTridentProcessor;
 import org.apache.storm.trident.windowing.WindowsStateFactory;
 import org.apache.storm.trident.windowing.WindowsStateUpdater;
 import org.apache.storm.trident.windowing.WindowsStoreFactory;
+import org.apache.storm.trident.windowing.config.SlidingCountWindow;
+import org.apache.storm.trident.windowing.config.SlidingDurationWindow;
+import org.apache.storm.trident.windowing.config.TumblingCountWindow;
+import org.apache.storm.trident.windowing.config.TumblingDurationWindow;
+import org.apache.storm.trident.windowing.config.WindowConfig;
 import org.apache.storm.tuple.Fields;
 import org.apache.storm.utils.Utils;
 
@@ -399,7 +405,7 @@ public class Stream implements IAggregatableStream {
     /**
      * Returns stream which does tumbling window with every count of tuples.
      *
-     * @param count represents no of tuples at which window tumbles
+     * @param windowCount represents tumbling count window legth
      * @param windowStoreFactory intermediary tuple store for storing tuples for windowing
      * @param inputFields input fields
      * @param aggregator aggregator to run on the window of tuples to compute the result and emit to the stream.
@@ -407,8 +413,72 @@ public class Stream implements IAggregatableStream {
      *
      * @return
      */
-    public Stream tumblingWindow(int count, WindowsStoreFactory windowStoreFactory,
-                                 Fields inputFields, Aggregator aggregator, Fields functionFields) {
+    public Stream tumblingCountWindow(int windowCount, WindowsStoreFactory windowStoreFactory,
+                         Fields inputFields, Aggregator aggregator, Fields functionFields) {
+        return window(TumblingCountWindow.of(windowCount), windowStoreFactory, inputFields, aggregator, functionFields);
+    }
+
+    /**
+     * Returns stream which does tumbling window with every count of tuples.
+     *
+     * @param windowCount represents window length count window configuration
+     * @param slideCount represents sliding count window configuration
+     * @param windowStoreFactory intermediary tuple store for storing tuples for windowing
+     * @param inputFields input fields
+     * @param aggregator aggregator to run on the window of tuples to compute the result and emit to the stream.
+     * @param functionFields fields of values to emit with aggregation.
+     *
+     * @return
+     */
+    public Stream slidingCountWindow(int windowCount, int slideCount, WindowsStoreFactory windowStoreFactory,
+                                     Fields inputFields, Aggregator aggregator, Fields functionFields) {
+        return window(SlidingCountWindow.of(windowCount, slideCount), windowStoreFactory, inputFields, aggregator, functionFields);
+    }
+
+    /**
+     * Returns stream which does tumbling window with every count of tuples.
+     *
+     * @param windowDuration represents window duration configuration
+     * @param slideDuration represents sliding duration  configuration
+     * @param windowStoreFactory intermediary tuple store for storing tuples for windowing
+     * @param inputFields input fields
+     * @param aggregator aggregator to run on the window of tuples to compute the result and emit to the stream.
+     * @param functionFields fields of values to emit with aggregation.
+     *
+     * @return
+     */
+    public Stream slidingTimeWindow(BaseWindowedBolt.Duration windowDuration,BaseWindowedBolt.Duration slideDuration, WindowsStoreFactory windowStoreFactory,
+                         Fields inputFields, Aggregator aggregator, Fields functionFields) {
+        return window(SlidingDurationWindow.of(windowDuration, slideDuration), windowStoreFactory, inputFields, aggregator, functionFields);
+    }
+
+    /**
+     * Returns stream which does tumbling window with every count of tuples.
+     *
+     * @param windowDuration represents tumbling window duration configuration
+     * @param windowStoreFactory intermediary tuple store for storing tuples for windowing
+     * @param inputFields input fields
+     * @param aggregator aggregator to run on the window of tuples to compute the result and emit to the stream.
+     * @param functionFields fields of values to emit with aggregation.
+     *
+     * @return
+     */
+    public Stream tumblingTimeWindow(BaseWindowedBolt.Duration windowDuration, WindowsStoreFactory windowStoreFactory,
+                         Fields inputFields, Aggregator aggregator, Fields functionFields) {
+        return window(TumblingDurationWindow.of(windowDuration), windowStoreFactory, inputFields, aggregator, functionFields);
+    }
+
+    /**
+     * Returns stream of aggregated results based on the given window configuration.
+     *
+     * @param windowConfig window configuration like window length and slide length.
+     * @param windowStoreFactory intermediary tuple store for storing tuples for windowing
+     * @param inputFields input fields
+     * @param aggregator aggregator to run on the window of tuples to compute the result and emit to the stream.
+     * @param functionFields fields of values to emit with aggregation.
+     * @return
+     */
+    public Stream window(WindowConfig windowConfig, WindowsStoreFactory windowStoreFactory, Fields inputFields, Aggregator aggregator, Fields functionFields) {
         projectionValidation(inputFields);
         Fields fields = addTriggerField(functionFields);
         Stream stream = _topology.addSourcedNode(this,
@@ -416,7 +486,7 @@ public class Stream implements IAggregatableStream {
                         _name,
                         fields,
                         fields,
-                        new WindowTridentProcessor(count, _topology.getUniqueWindowId(), windowStoreFactory, inputFields, aggregator)));
+                        new WindowTridentProcessor(windowConfig, _topology.getUniqueWindowId(), windowStoreFactory, inputFields, aggregator)));
         Stream effectiveStream = stream.project(functionFields);
 
         // create wrappers for StateFactory and StateUpdater with the given windowStoreFactory to remove trigger results

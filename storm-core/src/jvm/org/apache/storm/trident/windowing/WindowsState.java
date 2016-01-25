@@ -20,6 +20,8 @@ package org.apache.storm.trident.windowing;
 
 import org.apache.storm.trident.state.State;
 import org.apache.storm.trident.tuple.TridentTuple;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.List;
 
@@ -27,25 +29,23 @@ import java.util.List;
  *
  */
 public class WindowsState implements State {
+    private static final Logger log = LoggerFactory.getLogger(WindowsState.class);
 
-    private final WindowsStoreFactory windowsStoreFactory;
     private Long currentTxId;
 
-    public WindowsState(WindowsStoreFactory windowsStoreFactory) {
-        this.windowsStoreFactory = windowsStoreFactory;
+    public WindowsState() {
     }
 
     @Override
     public void beginCommit(Long txId) {
         currentTxId = txId;
-        System.out.println("##########WindowsState.beginCommit:: "+txId);
+        log.debug(" WindowsState.beginCommit:: [{}] ", txId);
     }
 
     @Override
     public void commit(Long txId) {
+        log.debug("WindowsState.commit :: [{}]", txId);
     }
-
-
 
     public Long getCurrentTxId() {
         return currentTxId;

@@ -48,12 +48,13 @@ public class WindowTridentProcessor implements TridentProcessor {
     public static final String TRIGGER_FIELD_NAME = "_task_info";
     static final String KEY_SEPARATOR = "|";
 
-    private int tumblingCount;
     private final String windowId;
-    private final WindowsStoreFactory windowStoreFactory;
     private final Fields inputFields;
     private final Aggregator aggregator;
     private WindowConfig windowConfig;
+
+    private WindowsStoreFactory windowStoreFactory;
+
     private Map conf;
     private TopologyContext topologyContext;
     private FreshCollector collector;
@@ -84,14 +85,7 @@ public class WindowTridentProcessor implements TridentProcessor {
         collector = new FreshCollector(tridentContext);
         projection = new TridentTupleView.ProjectionFactory(parents.get(0), inputFields);
         String windowTaskId = windowId + KEY_SEPARATOR + topologyContext.getThisTaskId() + KEY_SEPARATOR;
-        // todo create window-manager based on windowing strategy (tumbling/slide w.r.t count/time)
-        tridentWindowManager = null;
-        if(tumblingCount > 0) {
-            tridentWindowManager = new TridentWindowManager(tumblingCount, windowTaskId, windowStoreFactory.create(windowTaskId), aggregator, tridentContext.getDelegateCollector());
-        } else {
-            tridentWindowManager = new TridentWindowManager(windowConfig, windowTaskId, windowStoreFactory.create(windowTaskId), aggregator, tridentContext.getDelegateCollector());
-        }
-//        startTime = System.currentTimeMillis();
+        tridentWindowManager = new TridentWindowManager(windowConfig, windowTaskId, windowStoreFactory.create(windowTaskId), aggregator, tridentContext.getDelegateCollector());
     }
 
     @Override

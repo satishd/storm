@@ -30,19 +30,19 @@ import org.apache.storm.windowing.TriggerPolicy;
 /**
  *
  */
-public final class TumblingDurationWindowStrategy extends BaseWindowStrategy {
+public final class TumblingDurationWindowStrategy<T> extends BaseWindowStrategy<T> {
 
     public TumblingDurationWindowStrategy(WindowConfig tumblingDurationWindow) {
         super(tumblingDurationWindow);
     }
 
     @Override
-    public TriggerPolicy<TridentBatchTuple> getTriggerPolicy(TriggerHandler triggerHandler, EvictionPolicy<TridentBatchTuple> evictionPolicy) {
+    public TriggerPolicy<T> getTriggerPolicy(TriggerHandler triggerHandler, EvictionPolicy<T> evictionPolicy) {
         return new TimeTriggerPolicy<>(windowConfig.getSlideLength(), triggerHandler, evictionPolicy);
     }
 
     @Override
-    public EvictionPolicy<TridentBatchTuple> getEvictionPolicy() {
+    public EvictionPolicy<T> getEvictionPolicy() {
         return new TimeEvictionPolicy<>(windowConfig.getWindowLength());
     }
 }

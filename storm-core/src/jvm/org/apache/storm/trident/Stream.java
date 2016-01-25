@@ -55,6 +55,7 @@ import org.apache.storm.trident.state.StateFactory;
 import org.apache.storm.trident.state.StateSpec;
 import org.apache.storm.trident.state.StateUpdater;
 import org.apache.storm.trident.util.TridentUtils;
+import org.apache.storm.trident.windowing.InMemoryWindowsStoreFactory;
 import org.apache.storm.trident.windowing.WindowTridentProcessor;
 import org.apache.storm.trident.windowing.WindowsStateFactory;
 import org.apache.storm.trident.windowing.WindowsStateUpdater;
@@ -405,7 +406,21 @@ public class Stream implements IAggregatableStream {
     /**
      * Returns stream which does tumbling window with every count of tuples.
      *
-     * @param windowCount represents tumbling count window legth
+     * @param windowCount represents tumbling count window length
+     * @param inputFields input fields
+     * @param aggregator aggregator to run on the window of tuples to compute the result and emit to the stream.
+     * @param functionFields fields of values to emit with aggregation.
+     *
+     * @return
+     */
+    public Stream tumblingCountWindow(int windowCount, Fields inputFields, Aggregator aggregator, Fields functionFields) {
+        return window(TumblingCountWindow.of(windowCount), inputFields, aggregator, functionFields);
+    }
+
+    /**
+     * Returns stream which does tumbling window with every count of tuples.
+     *
+     * @param windowCount represents tumbling count window length
      * @param windowStoreFactory intermediary tuple store for storing tuples for windowing
      * @param inputFields input fields
      * @param aggregator aggregator to run on the window of tuples to compute the result and emit to the stream.
@@ -447,7 +462,7 @@ public class Stream implements IAggregatableStream {
      *
      * @return
      */
-    public Stream slidingTimeWindow(BaseWindowedBolt.Duration windowDuration,BaseWindowedBolt.Duration slideDuration, WindowsStoreFactory windowStoreFactory,
+    public Stream slidingTimeWindow(BaseWindowedBolt.Duration windowDuration, BaseWindowedBolt.Duration slideDuration, WindowsStoreFactory windowStoreFactory,
                          Fields inputFields, Aggregator aggregator, Fields functionFields) {
         return window(SlidingDurationWindow.of(windowDuration, slideDuration), windowStoreFactory, inputFields, aggregator, functionFields);
     }
@@ -466,6 +481,20 @@ public class Stream implements IAggregatableStream {
     public Stream tumblingTimeWindow(BaseWindowedBolt.Duration windowDuration, WindowsStoreFactory windowStoreFactory,
                          Fields inputFields, Aggregator aggregator, Fields functionFields) {
         return window(TumblingDurationWindow.of(windowDuration), windowStoreFactory, inputFields, aggregator, functionFields);
+    }
+
+    /**
+     * Returns stream of aggregated results based on the given window configuration.
+     *
+     * @param windowConfig window configuration like window length and slide length.
+     * @param inputFields input fields
+     * @param aggregator aggregator to run on the window of tuples to compute the result and emit to the stream.
+     * @param functionFields fields of values to emit with aggregation.
+     * @return
+     */
+    public Stream window(WindowConfig windowConfig, Fields inputFields, Aggregator aggregator, Fields functionFields) {
+        InMemoryWindowsStoreFactory inMemoryWindowsStoreFactory = new InMemoryWindowsStoreFactory();
+        return window(windowConfig, inMemoryWindowsStoreFactory, inputFields, aggregator, functionFields);
     }
 
     /**

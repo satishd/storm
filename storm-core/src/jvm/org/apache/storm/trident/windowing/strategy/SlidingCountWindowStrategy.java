@@ -30,19 +30,19 @@ import org.apache.storm.windowing.TriggerPolicy;
 /**
  *
  */
-public class SlidingCountWindowStrategy extends BaseWindowStrategy {
+public class SlidingCountWindowStrategy<T> extends BaseWindowStrategy<T> {
 
     public SlidingCountWindowStrategy(WindowConfig slidingCountWindow) {
         super(slidingCountWindow);
     }
 
     @Override
-    public TriggerPolicy<TridentBatchTuple> getTriggerPolicy(TriggerHandler triggerHandler, EvictionPolicy<TridentBatchTuple> evictionPolicy) {
+    public TriggerPolicy<T> getTriggerPolicy(TriggerHandler triggerHandler, EvictionPolicy<T> evictionPolicy) {
         return new CountTriggerPolicy<>(windowConfig.getSlideLength(), triggerHandler, evictionPolicy);
     }
 
     @Override
-    public EvictionPolicy<TridentBatchTuple> getEvictionPolicy() {
+    public EvictionPolicy<T> getEvictionPolicy() {
         return new CountEvictionPolicy<>(windowConfig.getWindowLength());
     }
 }

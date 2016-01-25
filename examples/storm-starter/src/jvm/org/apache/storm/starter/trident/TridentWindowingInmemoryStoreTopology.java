@@ -65,16 +65,7 @@ public class TridentWindowingInmemoryStoreTopology {
 
         Stream stream = topology.newStream("spout1", spout).parallelismHint(16).each(new Fields("sentence"),
                 new Split(), new Fields("word"))
-//                tumblingWindow(Duration.ofSeconds(10), mapState, new Fields("word"), null, new Fields("words"))
-//        .tumblingCountWindow(1000, mapState, new Fields("word"), new CountAsAggregator(), new Fields("count")).parallelismHint(2)
-//                        .window(new SlidingCountWindow(1000, 100), mapState, new Fields("word"), new CountAsAggregator(), new Fields("count"))
-//                        .window(new TumblingCountWindow(100), mapState, new Fields("word"), new CountAsAggregator(), new Fields("count"))
-//                        .window(new TumblingDurationWindow(new BaseWindowedBolt.Duration(5, TimeUnit.SECONDS)),
-//                                mapState, new Fields("word"), new CountAsAggregator(), new Fields("count"))
                         .window(windowConfig, mapState, new Fields("word"), new CountAsAggregator(), new Fields("count"))
-//        tumblingWindow(100, mapState, new Fields("word"), new EchoAggregator(), new Fields("count"))
-//                .aggregate(new Fields("count"), new Count(), new Fields("count-p"))
-//                .aggregate(new Fields("count-p"), new Count(), new Fields("count-aggr"))
                 .each(new Fields("count"), new Debug())
                 .each(new Fields("count"), new Echo(), new Fields("ct"))
                 .each(new Fields("ct"), new Debug())
@@ -144,13 +135,14 @@ public class TridentWindowingInmemoryStoreTopology {
             List<? extends WindowConfig> list = Arrays.asList(SlidingCountWindow.of(1000, 100), TumblingCountWindow.of(1000),
                     SlidingDurationWindow.of(new BaseWindowedBolt.Duration(6, TimeUnit.SECONDS), new BaseWindowedBolt.Duration(3, TimeUnit.SECONDS)),
                     TumblingDurationWindow.of(new BaseWindowedBolt.Duration(5, TimeUnit.SECONDS)));
+
             for (WindowConfig windowConfig : list) {
                 LocalCluster cluster = new LocalCluster();
                 cluster.submitTopology("wordCounter", conf, buildTopology(mapState, windowConfig));
                 Utils.sleep(60 * 1000);
                 cluster.shutdown();
             }
-//            System.exit(1);
+            System.exit(1);
         } else {
             conf.setNumWorkers(3);
             StormSubmitter.submitTopologyWithProgressBar(args[0], conf, buildTopology(mapState, SlidingCountWindow.of(1000, 100)));

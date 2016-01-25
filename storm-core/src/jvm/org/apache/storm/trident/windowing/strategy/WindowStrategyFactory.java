@@ -24,23 +24,23 @@ import org.apache.storm.trident.windowing.config.WindowConfig;
  *
  */
 //todo-sato add unit test for this factory
-public final class WindowStrategyFactory {
+public final class WindowStrategyFactory<T> {
 
-    public WindowStrategy create(WindowConfig windowConfig) {
-        WindowStrategy windowStrategy = null;
+    public WindowStrategy<T> create(WindowConfig windowConfig) {
+        WindowStrategy<T> windowStrategy = null;
         WindowConfig.Type windowType = windowConfig.getWindowType();
         switch(windowType) {
             case SLIDING_COUNT:
-                windowStrategy = new SlidingCountWindowStrategy(windowConfig);
+                windowStrategy = new SlidingCountWindowStrategy<>(windowConfig);
                 break;
             case TUMBLING_COUNT:
-                windowStrategy = new TumblingCountWindowStrategy(windowConfig);
+                windowStrategy = new TumblingCountWindowStrategy<>(windowConfig);
                 break;
             case SLIDING_DURATION:
-                windowStrategy = new SlidingDurationWindowStrategy(windowConfig);
+                windowStrategy = new SlidingDurationWindowStrategy<>(windowConfig);
                 break;
             case TUMBLING_DURATION:
-                windowStrategy = new TumblingDurationWindowStrategy(windowConfig);
+                windowStrategy = new TumblingDurationWindowStrategy<>(windowConfig);
                 break;
             default:
                 throw new IllegalArgumentException("Given WindowConfig of type "+windowType+" is not supported");

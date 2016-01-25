@@ -18,7 +18,6 @@
  */
 package org.apache.storm.trident.windowing.strategy;
 
-import org.apache.storm.trident.windowing.TridentBatchTuple;
 import org.apache.storm.trident.windowing.config.WindowConfig;
 import org.apache.storm.windowing.CountEvictionPolicy;
 import org.apache.storm.windowing.CountTriggerPolicy;
@@ -29,19 +28,19 @@ import org.apache.storm.windowing.TriggerPolicy;
 /**
  *
  */
-public final class TumblingCountWindowStrategy extends BaseWindowStrategy{
+public final class TumblingCountWindowStrategy<T> extends BaseWindowStrategy<T> {
 
     public TumblingCountWindowStrategy(WindowConfig tumblingCountWindow) {
         super(tumblingCountWindow);
     }
 
     @Override
-    public TriggerPolicy<TridentBatchTuple> getTriggerPolicy(TriggerHandler triggerHandler, EvictionPolicy<TridentBatchTuple> evictionPolicy) {
+    public TriggerPolicy<T> getTriggerPolicy(TriggerHandler triggerHandler, EvictionPolicy<T> evictionPolicy) {
         return new CountTriggerPolicy<>(windowConfig.getSlideLength(), triggerHandler, evictionPolicy);
     }
 
     @Override
-    public EvictionPolicy<TridentBatchTuple> getEvictionPolicy() {
+    public EvictionPolicy<T> getEvictionPolicy() {
         return new CountEvictionPolicy<>(windowConfig.getWindowLength());
     }
 }

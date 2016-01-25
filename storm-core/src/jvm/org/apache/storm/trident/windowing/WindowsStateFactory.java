@@ -29,18 +29,11 @@ import java.util.Map;
  */
 public class WindowsStateFactory implements StateFactory {
 
-    private final WindowsStoreFactory windowsStoreFactory;
-
     public WindowsStateFactory() {
-        this(null);
-    }
-
-    public WindowsStateFactory(WindowsStoreFactory windowsStoreFactory) {
-        this.windowsStoreFactory = windowsStoreFactory;
     }
 
     @Override
     public State makeState(Map conf, IMetricsContext metrics, int partitionIndex, int numPartitions) {
-        return new WindowsState(windowsStoreFactory);
+        return new WindowsState();
     }
 }

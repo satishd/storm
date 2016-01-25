@@ -26,8 +26,6 @@ import org.apache.storm.trident.tuple.TridentTuple;
 import org.apache.storm.trident.windowing.config.WindowConfig;
 import org.apache.storm.trident.windowing.strategy.WindowStrategy;
 import org.apache.storm.trident.windowing.strategy.WindowStrategyFactory;
-import org.apache.storm.windowing.CountEvictionPolicy;
-import org.apache.storm.windowing.CountTriggerPolicy;
 import org.apache.storm.windowing.EvictionPolicy;
 import org.apache.storm.windowing.TriggerPolicy;
 import org.apache.storm.windowing.WindowLifecycleListener;
@@ -38,7 +36,6 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -47,62 +44,34 @@ import java.util.concurrent.atomic.AtomicInteger;
 /**
  *
  */
-public class TridentWindowManager {
-    private static final Logger log = LoggerFactory.getLogger(TridentWindowManager.class);
+public class InMemoryTridentWindowManager {
+    private static final Logger log = LoggerFactory.getLogger(InMemoryTridentWindowManager.class);
 
     public static final String TRIGGER_PREFIX = "tr" + WindowTridentProcessor.KEY_SEPARATOR;
-    public static final String TUPLE_PREFIX = "tu" + WindowTridentProcessor.KEY_SEPARATOR;
 
-    private final WindowManager<TridentBatchTuple> windowManager;
+    private final WindowManager<TridentTuple> windowManager;
     private final WindowsStore windowStore;
     private final Aggregator aggregator;
     private final BatchOutputCollector delegateCollector;
     private final Queue<TriggerResult> pendingTriggers = new ConcurrentLinkedQueue<>();
     private final AtomicInteger triggerId = new AtomicInteger();
     private final String windowTriggerTaskId;
-    private final String windowTupleTaskId;
     private Set<String> activeBatches = new HashSet<>();
 
-    public TridentWindowManager(WindowConfig windowConfig, String windowTaskId, WindowsStore windowStore, Aggregator aggregator, BatchOutputCollector delegateCollector) {
+    public InMemoryTridentWindowManager(WindowConfig windowConfig, String windowTaskId, WindowsStore windowStore, Aggregator aggregator, BatchOutputCollector delegateCollector) {
         this.windowStore = windowStore;
         this.aggregator = aggregator;
         this.delegateCollector = delegateCollector;
 
         windowTriggerTaskId = TRIGGER_PREFIX + windowTaskId;
-        windowTupleTaskId = TUPLE_PREFIX + windowTaskId;
         windowManager = new WindowManager<>(new TridentWindowLifeCycleListener());
 
-        WindowStrategyFactory<TridentBatchTuple> windowStrategyFactory = new WindowStrategyFactory<>();
-        WindowStrategy<TridentBatchTuple> windowStrategy = windowStrategyFactory.create(windowConfig);
-        EvictionPolicy<TridentBatchTuple> evictionPolicy = windowStrategy.getEvictionPolicy();
+        WindowStrategyFactory<TridentTuple> windowStrategyFactory = new WindowStrategyFactory<>();
+        WindowStrategy<TridentTuple> windowStrategy = windowStrategyFactory.create(windowConfig);
+        EvictionPolicy<TridentTuple> evictionPolicy = windowStrategy.getEvictionPolicy();
         windowManager.setEvictionPolicy(evictionPolicy);
-        TriggerPolicy<TridentBatchTuple> triggerPolicy = windowStrategy.getTriggerPolicy(windowManager, evictionPolicy);
+        TriggerPolicy<TridentTuple> triggerPolicy = windowStrategy.getTriggerPolicy(windowManager, evictionPolicy);
         windowManager.setTriggerPolicy(triggerPolicy);
-    }
-
-    public void prepare() {
-        // get existing tuples and pending triggers for this operator-component/task and add them to WindowManager
-        Iterable<Map.Entry<String, Map<String, Object>>> allEntriesIterable = windowStore.getAllEntries();
-
-        for (Map.Entry<String, Map<String, Object>> primaryKeyEntries : allEntriesIterable) {
-            String primaryKey = primaryKeyEntries.getKey();
-            if(primaryKey.startsWith(TUPLE_PREFIX)) {
-                String batchId = batchIdFromPrimaryKey(primaryKey);
-                for (Map.Entry<String, Object> indexedTuples : primaryKeyEntries.getValue().entrySet()) {
-                    //todo store object which has both timestamp and TridentTuple
-                    windowManager.add(new TridentBatchTuple(batchId, System.currentTimeMillis(), (Integer) indexedTuples.getValue()));
-                }
-            } else if (primaryKey.startsWith(TRIGGER_PREFIX)) {
-                for (Map.Entry<String, Object> triggerEntry : primaryKeyEntries.getValue().entrySet()) {
-                    int triggerId = Integer.valueOf(triggerEntry.getKey());
-                    List<List<Object>> triggerValue = (List<List<Object>>) triggerEntry.getValue();
-                    pendingTriggers.add(new TriggerResult(triggerId, triggerValue));
-                }
-            } else {
-                log.warn("Ignoring unknown primary key entry from windows store %s", primaryKey);
-            }
-        }
-
     }
 
     private String batchIdFromPrimaryKey(String primaryKey) {
@@ -121,10 +90,8 @@ public class TridentWindowManager {
         }
 
         log.debug("Adding tuples to window-manager for batch: ", batchId);
-        for (int i = 0; i < tuples.size(); i++) {
-            String primaryKey = keyOf(batchId);
-            windowStore.put(new WindowsStore.Key(primaryKey, String.valueOf(i)), tuples.get(i));
-            windowManager.add(new TridentBatchTuple(primaryKey, System.currentTimeMillis(), i));
+        for (TridentTuple tuple : tuples) {
+            windowManager.add(tuple);
         }
     }
 
@@ -135,25 +102,21 @@ public class TridentWindowManager {
         return ((IBatchID) batchId).getId().toString();
     }
 
-    public String keyOf(Object batchId) {
-        return windowTupleTaskId +  WindowTridentProcessor.KEY_SEPARATOR + getBatchTxnId(batchId);
-    }
-
     public void shutdown() {
         windowManager.shutdown();
         windowStore.shutdown();
     }
 
-    class TridentWindowLifeCycleListener implements WindowLifecycleListener<TridentBatchTuple> {
+    class TridentWindowLifeCycleListener implements WindowLifecycleListener<TridentTuple> {
 
         @Override
-        public void onExpiry(List<TridentBatchTuple> expiredEvents) {
+        public void onExpiry(List<TridentTuple> expiredEvents) {
             log.debug("onExpiry is invoked");
-            removeExpiredTuplesFromStore(expiredEvents);
+//            removeExpiredTuplesFromStore(expiredEvents);
         }
 
         @Override
-        public void onActivation(List<TridentBatchTuple> events, List<TridentBatchTuple> newEvents, List<TridentBatchTuple> expired) {
+        public void onActivation(List<TridentTuple> events, List<TridentTuple> newEvents, List<TridentTuple> expired) {
             log.debug("onActivation is invoked with events size: {}", events.size());
             // trigger occurred, create an aggregation and keep them in store
             int currentTriggerId = triggerId.incrementAndGet();
@@ -161,12 +124,8 @@ public class TridentWindowManager {
         }
     }
 
-    private void execAggregatorAndStoreResult(int currentTriggerId, List<TridentBatchTuple> tridentBatchTuples) {
-        List<TridentTuple> resultTuples = new ArrayList<>();
-        for (TridentBatchTuple tridentBatchTuple : tridentBatchTuples) {
-            TridentTuple tuple = (TridentTuple) windowStore.get(tupleKey(tridentBatchTuple));
-            resultTuples.add(tuple);
-        }
+    private void execAggregatorAndStoreResult(int currentTriggerId, List<TridentTuple> tridentBatchTuples) {
+        List<TridentTuple> resultTuples = tridentBatchTuples;
 
         // run aggregator to compute the result
         AccumulatedTuplesCollector collector = new AccumulatedTuplesCollector(delegateCollector);
@@ -183,18 +142,6 @@ public class TridentWindowManager {
 
     protected WindowsStore.Key triggerKey(Integer currentTriggerId) {
         return new WindowsStore.Key(windowTriggerTaskId, currentTriggerId.toString());
-    }
-
-    private void removeExpiredTuplesFromStore(List<TridentBatchTuple> expiredTuples) {
-        List<WindowsStore.Key> keys = new ArrayList<>();
-        for (TridentBatchTuple expiredTuple : expiredTuples) {
-            keys.add(tupleKey(expiredTuple));
-        }
-        windowStore.removeAll(keys);
-    }
-
-    private WindowsStore.Key tupleKey(TridentBatchTuple tridentBatchTuple) {
-        return new WindowsStore.Key(tridentBatchTuple.batchId, String.valueOf(tridentBatchTuple.tupleIndex));
     }
 
     static class AccumulatedTuplesCollector implements TridentCollector {

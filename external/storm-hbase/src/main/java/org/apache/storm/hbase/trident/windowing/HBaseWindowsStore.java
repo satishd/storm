@@ -121,6 +121,24 @@ public class HBaseWindowsStore implements WindowsStore {
     }
 
     @Override
+    public void putAll(Collection<Entry> entries) {
+        List<Put> list = new ArrayList<>();
+        for (Entry entry : entries) {
+            Put put = new Put(effectiveKey(entry.key), System.currentTimeMillis());
+            Kryo kryo = new Kryo();
+            Output output = new Output(new ByteArrayOutputStream());
+            kryo.writeClassAndObject(output, entry.value);
+            put.add(family, ByteBuffer.wrap(qualifier), System.currentTimeMillis(), ByteBuffer.wrap(output.getBuffer(), 0, output.position()));
+        }
+
+        try {
+            htable.put(list);
+        } catch (InterruptedIOException | RetriesExhaustedWithDetailsException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
     public void remove(Key key) {
         Delete delete = new Delete(effectiveKey(key));
         try {

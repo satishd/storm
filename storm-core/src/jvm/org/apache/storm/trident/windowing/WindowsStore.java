@@ -15,16 +15,27 @@ public interface WindowsStore extends Serializable {
 
     public Object get(Key key);
 
-    // this should return iterator as there can be large no of tuples
     public Iterable<Map.Entry<String, Map<String, Object>>> getAllEntries();
 
     public void put(Key key, Object value);
+
+    public void putAll(Collection<Entry> entries);
 
     public void remove(Key key);
 
     public void removeAll(Collection<Key> keys);
 
     public void shutdown();
+
+    public static class Entry implements Serializable {
+        public final Key key;
+        public final Object value;
+
+        public Entry(Key key, Object value) {
+            this.key = key;
+            this.value = value;
+        }
+    }
 
     public static class Key implements Serializable {
         public final String primaryKey;

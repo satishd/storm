@@ -92,7 +92,8 @@
         Use "provided" scope to keep storm out of the jar-with-dependencies
         For IntelliJ dev, intellij will load properly.
       -->
-        <scope>${provided.scope}</scope>
+        <!-- todo-sato uncomment the below before raising PR -->
+        <!--<scope>${provided.scope}</scope>-->
     </dependency>
       <dependency>
           <groupId>org.apache.storm</groupId>

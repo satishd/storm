@@ -43,7 +43,7 @@ public class InMemoryWindowsStore implements WindowsStore, Serializable {
     /**
      *
      * @param maxSize maximum size of inmemory store
-     * @param backingStore backingstore containing the entries
+     * @param backingStore backing store containing the entries
      */
     public InMemoryWindowsStore(int maxSize, WindowsStore backingStore) {
         this.maxSize = maxSize;
@@ -126,7 +126,13 @@ public class InMemoryWindowsStore implements WindowsStore, Serializable {
             primaryKeyStore.put(key.primaryKey, primaryKeyContainer);
         }
         primaryKeyContainer.put(key.secondaryKey, value);
-        currentSize.incrementAndGet();
+        incrementCurrentSize();
+    }
+
+    private void incrementCurrentSize() {
+        if(backingStore != null) {
+            currentSize.incrementAndGet();
+        }
     }
 
     private boolean canAdd() {
@@ -159,10 +165,16 @@ public class InMemoryWindowsStore implements WindowsStore, Serializable {
         }
 
         if(primaryKeyContainer.remove(key.secondaryKey) != null) {
-            currentSize.decrementAndGet();
+            decrementSize();
         };
         if(primaryKeyContainer.isEmpty()) {
             primaryKeyStore.remove(key.primaryKey, Collections.emptyMap());
+        }
+    }
+
+    private void decrementSize() {
+        if(backingStore != null) {
+            currentSize.decrementAndGet();
         }
     }
 
@@ -189,8 +201,8 @@ public class InMemoryWindowsStore implements WindowsStore, Serializable {
     @Override
     public String toString() {
         return "InMemoryWindowsStore{" +
-                "primaryKeyStore:size =" + primaryKeyStore.size() +
-                "backingStore =" + backingStore +
+                " primaryKeyStore:size = " + primaryKeyStore.size() +
+                " backingStore = " + backingStore +
                 '}';
     }
 }

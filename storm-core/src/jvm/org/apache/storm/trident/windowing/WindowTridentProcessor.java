@@ -27,7 +27,6 @@ import org.apache.storm.trident.planner.processor.TridentContext;
 import org.apache.storm.trident.tuple.ConsList;
 import org.apache.storm.trident.tuple.TridentTuple;
 import org.apache.storm.trident.tuple.TridentTupleView;
-import org.apache.storm.trident.windowing.config.SlidingCountWindow;
 import org.apache.storm.trident.windowing.config.WindowConfig;
 import org.apache.storm.tuple.Fields;
 import org.slf4j.Logger;
@@ -59,7 +58,6 @@ public class WindowTridentProcessor implements TridentProcessor {
     private TopologyContext topologyContext;
     private FreshCollector collector;
     private TridentTupleView.ProjectionFactory projection;
-//    private long startTime;
     private TridentContext tridentContext;
     private TridentWindowManager tridentWindowManager;
 

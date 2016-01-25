@@ -30,4 +30,11 @@ public abstract class TridentWindowEvent {
         this.batchId = batchId;
     }
 
+    public long getTimeStamp() {
+        return timeStamp;
+    }
+
+    public String getBatchId() {
+        return batchId;
+    }
 }

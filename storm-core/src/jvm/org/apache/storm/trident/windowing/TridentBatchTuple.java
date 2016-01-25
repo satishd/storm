@@ -18,6 +18,8 @@
  */
 package org.apache.storm.trident.windowing;
 
+import org.apache.storm.trident.tuple.TridentTuple;
+
 /**
  *
  */
@@ -25,10 +27,16 @@ public class TridentBatchTuple {
     final String batchId;
     final long timeStamp;
     final int tupleIndex;
+    final TridentTuple tridentTuple;
 
     public TridentBatchTuple(String batchId, long timeStamp, int tupleIndex) {
+        this(batchId, timeStamp, tupleIndex, null);
+    }
+
+    public TridentBatchTuple(String batchId, long timeStamp, int tupleIndex, TridentTuple tridentTuple) {
         this.batchId = batchId;
         this.timeStamp = timeStamp;
         this.tupleIndex = tupleIndex;
+        this.tridentTuple = tridentTuple;
     }
 }

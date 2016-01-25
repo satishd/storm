@@ -18,15 +18,21 @@
  */
 package org.apache.storm.trident.windowing;
 
+import org.apache.storm.trident.tuple.TridentTuple;
+
 /**
  *
  */
-public class IndexedTridentTupleEvent extends TridentWindowEvent {
+public class IndexedTridentTupleEvent extends TridentTupleEvent {
 
     private final int tupleIndex;
 
-    public IndexedTridentTupleEvent(int tupleIndex, long timeStamp, String batchId) {
-        super(timeStamp, batchId);
+    public IndexedTridentTupleEvent(TridentTuple tridentTuple, int tupleIndex, long timeStamp, String batchId) {
+        super(tridentTuple, timeStamp, batchId);
         this.tupleIndex = tupleIndex;
+    }
+
+    public int getTupleIndex() {
+        return tupleIndex;
     }
 }

@@ -26,8 +26,6 @@ import org.apache.storm.trident.tuple.TridentTuple;
 import org.apache.storm.trident.windowing.config.WindowConfig;
 import org.apache.storm.trident.windowing.strategy.WindowStrategy;
 import org.apache.storm.trident.windowing.strategy.WindowStrategyFactory;
-import org.apache.storm.windowing.CountEvictionPolicy;
-import org.apache.storm.windowing.CountTriggerPolicy;
 import org.apache.storm.windowing.EvictionPolicy;
 import org.apache.storm.windowing.TriggerPolicy;
 import org.apache.storm.windowing.WindowLifecycleListener;
@@ -63,6 +61,9 @@ public class TridentWindowManager {
     private final String windowTupleTaskId;
     private Set<String> activeBatches = new HashSet<>();
 
+    private int maxTuplesSize = 1000;
+    private AtomicInteger currentTuplesSize = new AtomicInteger();
+
     public TridentWindowManager(WindowConfig windowConfig, String windowTaskId, WindowsStore windowStore, Aggregator aggregator, BatchOutputCollector delegateCollector) {
         this.windowStore = windowStore;
         this.aggregator = aggregator;
@@ -90,7 +91,7 @@ public class TridentWindowManager {
                 String batchId = batchIdFromPrimaryKey(primaryKey);
                 for (Map.Entry<String, Object> indexedTuples : primaryKeyEntries.getValue().entrySet()) {
                     //todo store object which has both timestamp and TridentTuple
-                    windowManager.add(new TridentBatchTuple(batchId, System.currentTimeMillis(), (Integer) indexedTuples.getValue()));
+                    addToWindowManager(Integer.valueOf(indexedTuples.getKey()), batchId, (TridentTuple) indexedTuples.getValue());
                 }
             } else if (primaryKey.startsWith(TRIGGER_PREFIX)) {
                 for (Map.Entry<String, Object> triggerEntry : primaryKeyEntries.getValue().entrySet()) {
@@ -99,10 +100,18 @@ public class TridentWindowManager {
                     pendingTriggers.add(new TriggerResult(triggerId, triggerValue));
                 }
             } else {
-                log.warn("Ignoring unknown primary key entry from windows store %s", primaryKey);
+                log.warn("Ignoring unknown primary key entry from windows store [{}]", primaryKey);
             }
         }
 
+    }
+
+    public TridentTuple getTridentTuple(TridentBatchTuple tridentBatchTuple) {
+        if(tridentBatchTuple.tridentTuple != null) {
+            return tridentBatchTuple.tridentTuple;
+        }
+
+        return (TridentTuple) windowStore.get(tupleKey(tridentBatchTuple));
     }
 
     private String batchIdFromPrimaryKey(String primaryKey) {
@@ -123,9 +132,19 @@ public class TridentWindowManager {
         log.debug("Adding tuples to window-manager for batch: ", batchId);
         for (int i = 0; i < tuples.size(); i++) {
             String primaryKey = keyOf(batchId);
-            windowStore.put(new WindowsStore.Key(primaryKey, String.valueOf(i)), tuples.get(i));
-            windowManager.add(new TridentBatchTuple(primaryKey, System.currentTimeMillis(), i));
+            TridentTuple tridentTuple = tuples.get(i);
+            windowStore.put(new WindowsStore.Key(primaryKey, String.valueOf(i)), tridentTuple);
+            addToWindowManager(i, primaryKey, tridentTuple);
         }
+    }
+
+    private void addToWindowManager(int tupleIndex, String batchTxnId, TridentTuple tridentTuple) {
+        TridentTuple actualTuple = null;
+        if(currentTuplesSize.get() < maxTuplesSize) {
+            currentTuplesSize.incrementAndGet();
+            actualTuple = tridentTuple;
+        }
+        windowManager.add(new TridentBatchTuple(batchTxnId, System.currentTimeMillis(), tupleIndex, actualTuple));
     }
 
     public String getBatchTxnId(Object batchId) {
@@ -164,7 +183,8 @@ public class TridentWindowManager {
     private void execAggregatorAndStoreResult(int currentTriggerId, List<TridentBatchTuple> tridentBatchTuples) {
         List<TridentTuple> resultTuples = new ArrayList<>();
         for (TridentBatchTuple tridentBatchTuple : tridentBatchTuples) {
-            TridentTuple tuple = (TridentTuple) windowStore.get(tupleKey(tridentBatchTuple));
+//            TridentTuple tuple = (TridentTuple) windowStore.get(tupleKey(tridentBatchTuple));
+            TridentTuple tuple = getTridentTuple(tridentBatchTuple);
             resultTuples.add(tuple);
         }
 
@@ -186,6 +206,7 @@ public class TridentWindowManager {
     }
 
     private void removeExpiredTuplesFromStore(List<TridentBatchTuple> expiredTuples) {
+        currentTuplesSize.addAndGet(-expiredTuples.size());
         List<WindowsStore.Key> keys = new ArrayList<>();
         for (TridentBatchTuple expiredTuple : expiredTuples) {
             keys.add(tupleKey(expiredTuple));

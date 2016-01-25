@@ -30,4 +30,8 @@ public class TridentTupleEvent extends TridentWindowEvent {
         super(timeStamp, batchId);
         this.tridentTuple = tridentTuple;
     }
+
+    public TridentTuple getTridentTuple() {
+        return tridentTuple;
+    }
 }

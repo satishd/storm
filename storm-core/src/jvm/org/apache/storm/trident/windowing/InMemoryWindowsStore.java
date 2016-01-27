@@ -19,9 +19,11 @@
 package org.apache.storm.trident.windowing;
 
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -67,43 +69,47 @@ public class InMemoryWindowsStore implements WindowsStore, Serializable {
     }
 
     @Override
-    public Iterable<Map.Entry<String, Map<String, Object>>> getAllEntries() {
+    public Iterable<Object> get(List<Key> keys) {
+        List<Object> values = new ArrayList<>();
+        for (Key key : keys) {
+            values.add(get(key));
+        }
+        return values;
+    }
+
+    @Override
+    public Iterable<WindowsStore.Entry> getAllEntries() {
         if(backingStore != null) {
             return backingStore.getAllEntries();
         }
 
-        final Iterator<Map.Entry<String, Map<String, Object>>> iterator = new UnmodifiableIterator<>(primaryKeyStore.entrySet().iterator());
-
-        return new Iterable<Map.Entry<String, Map<String, Object>>>() {
+        final Iterator<Map.Entry<String, Map<String, Object>>> storeIterator = primaryKeyStore.entrySet().iterator();
+        final Iterator<WindowsStore.Entry> resultIterator = new Iterator<WindowsStore.Entry>() {
             @Override
-            public Iterator<Map.Entry<String, Map<String, Object>>> iterator() {
-                return iterator;
+            public boolean hasNext() {
+                return storeIterator.hasNext();
+            }
+
+            @Override
+            public WindowsStore.Entry next() {
+                // todo-sato implement this!
+                Map.Entry<String, Map<String, Object>> next = storeIterator.next();
+//                next.getValue().entrySet()
+                return null;
+            }
+
+            @Override
+            public void remove() {
+                throw new UnsupportedOperationException("remove operation is not supported as it is immutable.");
             }
         };
-    }
 
-    static class UnmodifiableIterator<E> implements Iterator<E> {
-
-        private final Iterator<E> delegate;
-
-        public UnmodifiableIterator(Iterator<E> iterator) {
-            delegate = iterator;
-        }
-
-        @Override
-        public boolean hasNext() {
-            return delegate.hasNext();
-        }
-
-        @Override
-        public E next() {
-            return delegate.next();
-        }
-
-        @Override
-        public void remove() {
-            throw new UnsupportedOperationException("remove operation is not supported as it is immutable.");
-        }
+        return new Iterable<WindowsStore.Entry>() {
+            @Override
+            public Iterator<WindowsStore.Entry> iterator() {
+                return resultIterator;
+            }
+        };
     }
 
     @Override

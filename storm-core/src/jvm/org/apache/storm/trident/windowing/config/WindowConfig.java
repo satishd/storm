@@ -25,9 +25,12 @@ import java.io.Serializable;
  */
 public interface WindowConfig extends Serializable {
     public int getWindowLength();
+
     public int getSlideLength();
 
     public Type getWindowType();
+
+    public void validate();
 
     public enum Type {
         SLIDING_COUNT,

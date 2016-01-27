@@ -55,7 +55,7 @@ import java.util.concurrent.TimeUnit;
  */
 public class TridentWindowingInmemoryStoreTopology {
 
-    public static StormTopology buildTopology(WindowsStoreFactory mapState, WindowConfig windowConfig) throws Exception {
+    public static StormTopology buildTopology(WindowsStoreFactory windowStore, WindowConfig windowConfig) throws Exception {
         FixedBatchSpout spout = new FixedBatchSpout(new Fields("sentence"), 3, new Values("the cow jumped over the moon"),
                 new Values("the man went to the store and bought some candy"), new Values("four score and seven years ago"),
                 new Values("how many apples can you eat"), new Values("to be or not to be the person"));
@@ -65,11 +65,10 @@ public class TridentWindowingInmemoryStoreTopology {
 
         Stream stream = topology.newStream("spout1", spout).parallelismHint(16).each(new Fields("sentence"),
                 new Split(), new Fields("word"))
-                        .window(windowConfig, mapState, new Fields("word"), new CountAsAggregator(), new Fields("count"))
+                .window(windowConfig, windowStore, new Fields("word"), new CountAsAggregator(), new Fields("count"))
                 .each(new Fields("count"), new Debug())
                 .each(new Fields("count"), new Echo(), new Fields("ct"))
-                .each(new Fields("ct"), new Debug())
-                ;
+                .each(new Fields("ct"), new Debug());
 
         return topology.build();
     }

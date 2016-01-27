@@ -3,9 +3,11 @@
  */
 package org.apache.storm.trident.windowing;
 
+import com.google.common.base.Preconditions;
+
 import java.io.Serializable;
 import java.util.Collection;
-import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -15,7 +17,9 @@ public interface WindowsStore extends Serializable {
 
     public Object get(Key key);
 
-    public Iterable<Map.Entry<String, Map<String, Object>>> getAllEntries();
+    Iterable<Object> get(List<Key> keys);
+
+    public Iterable<WindowsStore.Entry> getAllEntries();
 
     public void put(Key key, Object value);
 
@@ -32,9 +36,20 @@ public interface WindowsStore extends Serializable {
         public final Object value;
 
         public Entry(Key key, Object value) {
+            nonNullCheckForKey(key);
+            nonNullCheckForValue(value);
             this.key = key;
             this.value = value;
         }
+
+        public static void nonNullCheckForKey(Object key) {
+            Preconditions.checkArgument(key != null, "key argument can not be null");
+        }
+
+        public static void nonNullCheckForValue(Object value) {
+            Preconditions.checkArgument(value != null, "value argument can not be null");
+        }
+
     }
 
     public static class Key implements Serializable {
@@ -42,6 +57,9 @@ public interface WindowsStore extends Serializable {
         public final String secondaryKey;
 
         public Key(String primaryKey, String secondaryKey) {
+            Preconditions.checkArgument(primaryKey!= null, "primaryKey argument can not be null");
+            Preconditions.checkArgument(secondaryKey!= null, "secondaryKey argument can not be null");
+
             this.primaryKey = primaryKey;
             this.secondaryKey = secondaryKey;
         }

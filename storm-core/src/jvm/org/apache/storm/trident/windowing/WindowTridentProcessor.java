@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- * <p>
+ * <p/>
  * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * <p/>
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -18,6 +18,7 @@
  */
 package org.apache.storm.trident.windowing;
 
+import org.apache.storm.Config;
 import org.apache.storm.task.TopologyContext;
 import org.apache.storm.trident.operation.Aggregator;
 import org.apache.storm.trident.planner.ProcessorContext;
@@ -50,6 +51,7 @@ public class WindowTridentProcessor implements TridentProcessor {
     private final String windowId;
     private final Fields inputFields;
     private final Aggregator aggregator;
+    private final boolean storeTuplesInStore;
     private WindowConfig windowConfig;
 
     private WindowsStoreFactory windowStoreFactory;
@@ -59,16 +61,17 @@ public class WindowTridentProcessor implements TridentProcessor {
     private FreshCollector collector;
     private TridentTupleView.ProjectionFactory projection;
     private TridentContext tridentContext;
-    private TridentWindowManager tridentWindowManager;
+    private ITridentWindowManager tridentWindowManager;
 
-    public WindowTridentProcessor(WindowConfig windowConfig, String uniqueWindowId,
-                                  WindowsStoreFactory windowStoreFactory, Fields inputFields, Aggregator aggregator) {
+    public WindowTridentProcessor(WindowConfig windowConfig, String uniqueWindowId, WindowsStoreFactory windowStoreFactory,
+                                  Fields inputFields, Aggregator aggregator, boolean storeTuplesInStore) {
 
         this.windowConfig = windowConfig;
         windowId = uniqueWindowId;
         this.windowStoreFactory = windowStoreFactory;
         this.inputFields = inputFields;
         this.aggregator = aggregator;
+        this.storeTuplesInStore = storeTuplesInStore;
     }
 
     @Override
@@ -77,13 +80,25 @@ public class WindowTridentProcessor implements TridentProcessor {
         this.topologyContext = context;
         List<TridentTuple.Factory> parents = tridentContext.getParentTupleFactories();
         if (parents.size() != 1) {
-            throw new RuntimeException("Aggregate operation can only have one parent");
+            throw new RuntimeException("Aggregation related operation can only have one parent");
         }
+
+        Integer maxTuplesCacheSize = getWindowTuplesCacheSize(conf);
+
         this.tridentContext = tridentContext;
         collector = new FreshCollector(tridentContext);
         projection = new TridentTupleView.ProjectionFactory(parents.get(0), inputFields);
         String windowTaskId = windowId + KEY_SEPARATOR + topologyContext.getThisTaskId() + KEY_SEPARATOR;
-        tridentWindowManager = new TridentWindowManager(windowConfig, windowTaskId, windowStoreFactory.create(windowTaskId), aggregator, tridentContext.getDelegateCollector());
+        tridentWindowManager = storeTuplesInStore ?
+                new TridentWindowManager(windowConfig, windowTaskId, windowStoreFactory.create(windowTaskId), aggregator, tridentContext.getDelegateCollector(), maxTuplesCacheSize)
+                : new InMemoryTridentWindowManager(windowConfig, windowTaskId, windowStoreFactory.create(windowTaskId), aggregator, tridentContext.getDelegateCollector());
+    }
+
+    private Integer getWindowTuplesCacheSize(Map conf) {
+        if(conf.containsKey(Config.TOPOLOGY_TRIDENT_WINDOWING_INMEMORY_CACHE_LIMIT)) {
+            return (Integer) conf.get(Config.TOPOLOGY_TRIDENT_WINDOWING_INMEMORY_CACHE_LIMIT);
+        }
+        return null;
     }
 
     @Override
@@ -117,7 +132,7 @@ public class WindowTridentProcessor implements TridentProcessor {
 
         Iterator<TridentWindowManager.TriggerResult> pendingTriggersIter = pendingTriggers.iterator();
         TridentWindowManager.TriggerResult triggerResult = null;
-        while(pendingTriggersIter.hasNext()) {
+        while (pendingTriggersIter.hasNext()) {
             triggerResult = pendingTriggersIter.next();
             for (List<Object> aggregatedResult : triggerResult.result) {
                 collector.emit(new ConsList(tridentWindowManager.triggerKey(triggerResult.id), aggregatedResult));

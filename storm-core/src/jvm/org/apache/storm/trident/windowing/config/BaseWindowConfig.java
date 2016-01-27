@@ -39,4 +39,10 @@ public abstract class BaseWindowConfig implements WindowConfig {
     public int getSlideLength() {
         return slideLength;
     }
+
+    public void validate() {
+        if (slideLength > windowLength) {
+            throw new IllegalArgumentException("slideLength '" + slideLength + "' should always be less than windowLegth '" + windowLength + "'");
+        }
+    }
 }

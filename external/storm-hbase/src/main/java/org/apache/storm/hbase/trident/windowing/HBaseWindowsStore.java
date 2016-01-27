@@ -163,7 +163,7 @@ public class HBaseWindowsStore implements WindowsStore {
     }
 
     @Override
-    public Iterable<WindowsStore.Entry> getAllEntries() {
+    public Iterable<WindowsStore.Entry> getAllKeys() {
         //todo-sato implement this functionality
         Scan scan = new Scan();
 

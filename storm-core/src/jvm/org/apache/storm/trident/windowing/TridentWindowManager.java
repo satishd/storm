@@ -28,7 +28,6 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -55,21 +54,17 @@ public class TridentWindowManager extends BaseTridentWindowManager<TridentBatchT
 
     public void prepare() {
         // get existing tuples and pending triggers for this operator-component/task and add them to WindowManager
-        Iterable<Map.Entry<String, Map<String, Object>>> allEntriesIterable = windowStore.getAllEntries();
-
-        for (Map.Entry<String, Map<String, Object>> primaryKeyEntries : allEntriesIterable) {
-            String primaryKey = primaryKeyEntries.getKey();
+        Iterable<WindowsStore.Entry> allEntriesIterable = windowStore.getAllKeys();
+        //todo-sato how to maintain uniqueness in generating trigger keys so that there will be no overlaps between task restarts.
+        // oneway to do that may be store get existing server restart count and increment it when a task is prepared.
+        List<String> triggerKeys = new ArrayList<>();
+        for (WindowsStore.Entry entry : allEntriesIterable) {
+            String primaryKey = entry.key.primaryKey;
             if (primaryKey.startsWith(TUPLE_PREFIX)) {
                 String batchId = batchIdFromPrimaryKey(primaryKey);
-                for (Map.Entry<String, Object> indexedTuples : primaryKeyEntries.getValue().entrySet()) {
-                    addToWindowManager(Integer.valueOf(indexedTuples.getKey()), batchId, (TridentTuple) indexedTuples.getValue());
-                }
+                windowManager.add(new TridentBatchTuple(batchId, System.currentTimeMillis(), Integer.valueOf(entry.key.secondaryKey), null));
             } else if (primaryKey.startsWith(TRIGGER_PREFIX)) {
-                for (Map.Entry<String, Object> triggerEntry : primaryKeyEntries.getValue().entrySet()) {
-                    int triggerId = Integer.valueOf(triggerEntry.getKey());
-                    List<List<Object>> triggerValue = (List<List<Object>>) triggerEntry.getValue();
-                    pendingTriggers.add(new TriggerResult(triggerId, triggerValue));
-                }
+                triggerKeys.add(primaryKey);
             } else {
                 log.warn("Ignoring unknown primary key entry from windows store [{}]", primaryKey);
             }

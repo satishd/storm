@@ -78,9 +78,9 @@ public class InMemoryWindowsStore implements WindowsStore, Serializable {
     }
 
     @Override
-    public Iterable<WindowsStore.Entry> getAllEntries() {
+    public Iterable<WindowsStore.Entry> getAllKeys() {
         if(backingStore != null) {
-            return backingStore.getAllEntries();
+            return backingStore.getAllKeys();
         }
 
         final Iterator<Map.Entry<String, Map<String, Object>>> storeIterator = primaryKeyStore.entrySet().iterator();

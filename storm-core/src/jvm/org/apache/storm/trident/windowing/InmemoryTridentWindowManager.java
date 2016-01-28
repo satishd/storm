@@ -41,12 +41,6 @@ public class InMemoryTridentWindowManager extends BaseTridentWindowManager<Tride
     }
 
     @Override
-    public void prepare() {
-        super.prepare();
-        log.debug("InMemoryTridentWindowManager.prepare");
-    }
-
-    @Override
     public List<TridentTuple> getTridentTuples(List<TridentTuple> tridentBatchTuples) {
         return tridentBatchTuples;
     }

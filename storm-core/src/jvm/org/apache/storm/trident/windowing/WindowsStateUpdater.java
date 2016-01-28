@@ -67,7 +67,7 @@ public class WindowsStateUpdater implements StateUpdater<WindowsState> {
 
     @Override
     public void prepare(Map conf, TridentOperationContext context) {
-        windowsStore = windowStoreFactory.create(null);
+        windowsStore = windowStoreFactory.create();
     }
 
     @Override

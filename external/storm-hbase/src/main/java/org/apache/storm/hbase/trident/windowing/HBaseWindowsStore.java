@@ -29,6 +29,7 @@ import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.RetriesExhaustedWithDetailsException;
 import org.apache.hadoop.hbase.client.Scan;
+import org.apache.hadoop.hbase.filter.FirstKeyOnlyFilter;
 import org.apache.storm.trident.windowing.WindowsStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,17 +52,13 @@ public class HBaseWindowsStore implements WindowsStore {
     public static final String UTF_8 = "utf-8";
 
     private final HTable htable;
-    private byte[] baseId;
     private byte[] family;
     private byte[] qualifier;
 
-    public HBaseWindowsStore(Configuration config, String baseId, String tableName, byte[] family, byte[] qualifier) {
+    public HBaseWindowsStore(Configuration config, String tableName, byte[] family, byte[] qualifier) {
         this.family = family;
         this.qualifier = qualifier;
 
-        if(baseId != null) {
-            this.baseId = baseId.getBytes();
-        }
         try {
             htable = new HTable(config, tableName);
         } catch (IOException e) {
@@ -69,29 +66,9 @@ public class HBaseWindowsStore implements WindowsStore {
         }
     }
 
-    private byte[] effectiveKey(byte[] key) {
-
-        if(baseId == null) {
-            return key;
-        }
-
-        byte[] effectiveKey = new byte[baseId.length + key.length];
-        System.arraycopy(baseId, 0, effectiveKey, 0, baseId.length);
-        System.arraycopy(key, 0, effectiveKey, baseId.length, effectiveKey.length);
-        return effectiveKey;
-    }
-
     private byte[] effectiveKey(String key) {
         try {
             return key.getBytes(UTF_8);
-        } catch (UnsupportedEncodingException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    private String createKey(byte[] bytes) {
-        try {
-            return new String(bytes, UTF_8);
         } catch (UnsupportedEncodingException e) {
             throw new RuntimeException(e);
         }
@@ -155,9 +132,11 @@ public class HBaseWindowsStore implements WindowsStore {
     }
 
     @Override
-    public Iterable<WindowsStore.Entry> getAllKeys() {
-        //todo-sato implement this functionality
+    public Iterable<String> getAllKeys() {
         Scan scan = new Scan();
+        // this filter makes sure to receive only Key or row but not values associated with those rows.
+        scan.setFilter(new FirstKeyOnlyFilter());
+        scan.setCaching(1000);
 
         final Iterator<Result> resultIterator;
         try {
@@ -167,19 +146,19 @@ public class HBaseWindowsStore implements WindowsStore {
         }
 
         final Kryo kryo = new Kryo();
-        final Iterator<WindowsStore.Entry> iterator = new Iterator<WindowsStore.Entry>() {
+        final Iterator<String> iterator = new Iterator<String>() {
             @Override
             public boolean hasNext() {
                 return resultIterator.hasNext();
             }
 
             @Override
-            public WindowsStore.Entry next() {
+            public String next() {
                 Result result = resultIterator.next();
-                Input input = new Input(result.getValue(family, qualifier));
-                Object value = kryo.readClassAndObject(input);
-                String key = createKey(result.getRow());
-                return new WindowsStore.Entry(key, value);
+                Input input = new Input(result.getRow());
+                Object object = kryo.readClassAndObject(input);
+                String key = (String) object;
+                return key;
             }
 
             @Override
@@ -188,9 +167,9 @@ public class HBaseWindowsStore implements WindowsStore {
             }
         };
 
-        return new Iterable<WindowsStore.Entry>() {
+        return new Iterable<String>() {
             @Override
-            public Iterator<WindowsStore.Entry> iterator() {
+            public Iterator<String> iterator() {
                 return iterator;
             }
         };

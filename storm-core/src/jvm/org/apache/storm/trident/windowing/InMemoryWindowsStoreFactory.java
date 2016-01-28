@@ -28,8 +28,7 @@ public class InMemoryWindowsStoreFactory implements WindowsStoreFactory {
     private InMemoryWindowsStore inMemoryWindowsStore;
 
     @Override
-    public WindowsStore create(String baseId) {
-        // baseId is ignored here, as it is inmemory and one store instance for each task.
+    public WindowsStore create() {
         if(inMemoryWindowsStore == null) {
             inMemoryWindowsStore = new InMemoryWindowsStore();
         }

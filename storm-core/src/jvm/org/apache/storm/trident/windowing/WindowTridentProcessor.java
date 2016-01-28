@@ -89,8 +89,8 @@ public class WindowTridentProcessor implements TridentProcessor {
         projection = new TridentTupleView.ProjectionFactory(parents.get(0), inputFields);
         String windowTaskId = windowId + WindowsStore.KEY_SEPARATOR + topologyContext.getThisTaskId() + WindowsStore.KEY_SEPARATOR;
         tridentWindowManager = storeTuplesInStore ?
-                new TridentWindowManager(windowConfig, windowTaskId, windowStoreFactory.create(windowTaskId), aggregator, tridentContext.getDelegateCollector(), maxTuplesCacheSize)
-                : new InMemoryTridentWindowManager(windowConfig, windowTaskId, windowStoreFactory.create(windowTaskId), aggregator, tridentContext.getDelegateCollector());
+                new TridentWindowManager(windowConfig, windowTaskId, windowStoreFactory.create(), aggregator, tridentContext.getDelegateCollector(), maxTuplesCacheSize)
+                : new InMemoryTridentWindowManager(windowConfig, windowTaskId, windowStoreFactory.create(), aggregator, tridentContext.getDelegateCollector());
     }
 
     private Integer getWindowTuplesCacheSize(Map conf) {

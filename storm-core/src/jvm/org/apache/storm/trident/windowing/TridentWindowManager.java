@@ -55,18 +55,15 @@ public class TridentWindowManager extends BaseTridentWindowManager<TridentBatchT
     public void prepare() {
         super.prepare();
         // get existing tuples and pending triggers for this operator-component/task and add them to WindowManager
-        Iterable<WindowsStore.Entry> allEntriesIterable = windowStore.getAllKeys();
-        //todo-sato how to maintain uniqueness in generating trigger keys so that there will be no overlaps between task restarts.
-        // oneway to do that may be store get existing server restart count and increment it when a task is prepared.
+        Iterable<String> allEntriesIterable = windowStore.getAllKeys();
         List<String> triggerKeys = new ArrayList<>();
-        for (WindowsStore.Entry entry : allEntriesIterable) {
-            String key = entry.key;
+        for (String key : allEntriesIterable) {
             if (key.startsWith(windowTupleTaskId)) {
                 int tupleIndexValue = lastPart(key);
                 String batchId = secondLastPart(key);
                 windowManager.add(new TridentBatchTuple(batchId, System.currentTimeMillis(), tupleIndexValue, null));
             } else if (key.startsWith(windowTriggerTaskId)) {
-                triggerKeys.add(entry.key);
+                triggerKeys.add(key);
             } else {
                 log.warn("Ignoring unknown primary key entry from windows store [{}]", key);
             }

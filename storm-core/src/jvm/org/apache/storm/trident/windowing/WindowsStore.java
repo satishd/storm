@@ -20,7 +20,7 @@ public interface WindowsStore extends Serializable {
 
     public Iterable<Object> get(List<String> keys);
 
-    public Iterable<WindowsStore.Entry> getAllKeys();
+    public Iterable<String> getAllKeys();
 
     public void put(String key, Object value);
 

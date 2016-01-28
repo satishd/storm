@@ -38,14 +38,14 @@ public class HBaseWindowsStoreFactory implements WindowsStoreFactory {
         this.qualifier = qualifier;
     }
 
-    public WindowsStore create(String baseId) {
+    public WindowsStore create() {
         Configuration configuration = HBaseConfiguration.create();
         for (Map.Entry<String, Object> entry : config.entrySet()) {
             if (entry.getValue() != null) {
                 configuration.set(entry.getKey(), entry.getValue().toString());
             }
         }
-        return new HBaseWindowsStore(configuration, baseId, tableName, family, qualifier);
+        return new HBaseWindowsStore(configuration, tableName, family, qualifier);
     }
 
 }

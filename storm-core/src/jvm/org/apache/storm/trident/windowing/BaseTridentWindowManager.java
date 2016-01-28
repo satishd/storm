@@ -81,6 +81,7 @@ public abstract class BaseTridentWindowManager<T> implements ITridentWindowManag
 
     @Override
     public void prepare() {
+        log.debug("Getting current trigger count for this component/task");
         // get trigger count value from store
         Object result = windowStore.get(windowTriggerCountId);
         Integer currentCount = 0;

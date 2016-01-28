@@ -23,7 +23,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -73,22 +72,21 @@ public class InMemoryWindowsStore implements WindowsStore, Serializable {
     }
 
     @Override
-    public Iterable<WindowsStore.Entry> getAllKeys() {
+    public Iterable<String> getAllKeys() {
         if(backingStore != null) {
             return backingStore.getAllKeys();
         }
 
-        final Iterator<Map.Entry<String, Object>> storeIterator = store.entrySet().iterator();
-        final Iterator<WindowsStore.Entry> resultIterator = new Iterator<WindowsStore.Entry>() {
+        final Iterator<String> storeIterator = store.keySet().iterator();
+        final Iterator<String> resultIterator = new Iterator<String>() {
             @Override
             public boolean hasNext() {
                 return storeIterator.hasNext();
             }
 
             @Override
-            public WindowsStore.Entry next() {
-                Map.Entry<String, Object> entry = storeIterator.next();
-                return new Entry(entry.getKey(), entry.getValue());
+            public String next() {
+                return  storeIterator.next();
             }
 
             @Override
@@ -97,9 +95,9 @@ public class InMemoryWindowsStore implements WindowsStore, Serializable {
             }
         };
 
-        return new Iterable<WindowsStore.Entry>() {
+        return new Iterable<String>() {
             @Override
-            public Iterator<WindowsStore.Entry> iterator() {
+            public Iterator<String> iterator() {
                 return resultIterator;
             }
         };

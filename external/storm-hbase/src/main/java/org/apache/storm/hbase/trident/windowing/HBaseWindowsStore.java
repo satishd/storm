@@ -61,6 +61,7 @@ public class HBaseWindowsStore implements WindowsStore {
 
         try {
             htable = new HTable(config, tableName);
+            htable.setAutoFlush(true, true);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -136,7 +137,7 @@ public class HBaseWindowsStore implements WindowsStore {
         Scan scan = new Scan();
         // this filter makes sure to receive only Key or row but not values associated with those rows.
         scan.setFilter(new FirstKeyOnlyFilter());
-        scan.setCaching(1000);
+        //scan.setCaching(1000);
 
         final Iterator<Result> resultIterator;
         try {
@@ -145,7 +146,6 @@ public class HBaseWindowsStore implements WindowsStore {
             throw new RuntimeException(e);
         }
 
-        final Kryo kryo = new Kryo();
         final Iterator<String> iterator = new Iterator<String>() {
             @Override
             public boolean hasNext() {
@@ -155,9 +155,12 @@ public class HBaseWindowsStore implements WindowsStore {
             @Override
             public String next() {
                 Result result = resultIterator.next();
-                Input input = new Input(result.getRow());
-                Object object = kryo.readClassAndObject(input);
-                String key = (String) object;
+                String key = null;
+                try {
+                    key = new String(result.getRow(), UTF_8);
+                } catch (UnsupportedEncodingException e) {
+                    throw new RuntimeException(e);
+                }
                 return key;
             }
 
@@ -183,7 +186,7 @@ public class HBaseWindowsStore implements WindowsStore {
         if(value == null) {
             throw new IllegalArgumentException("Invalid value of null with key: "+key);
         }
-        Put put = new Put(effectiveKey(key), System.currentTimeMillis());
+        Put put = new Put(effectiveKey(key));
         Kryo kryo = new Kryo();
         Output output = new Output(new ByteArrayOutputStream());
         kryo.writeClassAndObject(output, value);
@@ -198,12 +201,13 @@ public class HBaseWindowsStore implements WindowsStore {
     @Override
     public void putAll(Collection<Entry> entries) {
         List<Put> list = new ArrayList<>();
-        Kryo kryo = new Kryo();
         for (Entry entry : entries) {
-            Put put = new Put(effectiveKey(entry.key), System.currentTimeMillis());
+            Put put = new Put(effectiveKey(entry.key));
             Output output = new Output(new ByteArrayOutputStream());
+            Kryo kryo = new Kryo();
             kryo.writeClassAndObject(output, entry.value);
             put.add(family, ByteBuffer.wrap(qualifier), System.currentTimeMillis(), ByteBuffer.wrap(output.getBuffer(), 0, output.position()));
+            list.add(put);
         }
 
         try {
@@ -217,7 +221,7 @@ public class HBaseWindowsStore implements WindowsStore {
     public void remove(String key) {
         WindowsStore.Entry.nonNullCheckForKey(key);
 
-        Delete delete = new Delete(effectiveKey(key));
+        Delete delete = new Delete(effectiveKey(key), System.currentTimeMillis());
         try {
             htable.delete(delete);
         } catch (IOException e) {
@@ -231,7 +235,7 @@ public class HBaseWindowsStore implements WindowsStore {
         for (String key : keys) {
             WindowsStore.Entry.nonNullCheckForKey(key);
 
-            Delete delete = new Delete(effectiveKey(key));
+            Delete delete = new Delete(effectiveKey(key), System.currentTimeMillis());
             deleteBatch.add(delete);
         }
         try {

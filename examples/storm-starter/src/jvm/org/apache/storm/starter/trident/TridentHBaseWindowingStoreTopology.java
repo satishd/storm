@@ -16,13 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.storm.hbase.trident;
+package org.apache.storm.starter.trident;
 
 import org.apache.storm.Config;
 import org.apache.storm.LocalCluster;
 import org.apache.storm.StormSubmitter;
 import org.apache.storm.generated.StormTopology;
 import org.apache.storm.hbase.trident.windowing.HBaseWindowsStoreFactory;
+import org.apache.storm.topology.base.BaseWindowedBolt;
 import org.apache.storm.trident.Stream;
 import org.apache.storm.trident.TridentTopology;
 import org.apache.storm.trident.operation.BaseFunction;
@@ -41,28 +42,25 @@ import org.apache.storm.utils.Utils;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 /**
  *
  */
 public class TridentHBaseWindowingStoreTopology {
 
-    public static StormTopology buildTopology(WindowsStoreFactory mapState) throws Exception {
+    public static StormTopology buildTopology(WindowsStoreFactory windowsStore) throws Exception {
         FixedBatchSpout spout = new FixedBatchSpout(new Fields("sentence"), 3, new Values("the cow jumped over the moon"),
                 new Values("the man went to the store and bought some candy"), new Values("four score and seven years ago"),
                 new Values("how many apples can you eat"), new Values("to be or not to be the person"));
         spout.setCycle(true);
 
         TridentTopology topology = new TridentTopology();
-//        TridentState wordCounts = topology.newStream("spout1", spout).parallelismHint(16).each(new Fields("sentence"),
-//                new Split(), new Fields("word")).groupBy(new Fields("word")).persistentAggregate(new MemoryMapState.Factory(),
-//                new Count(), new Fields("count")).parallelismHint(16);
 
         Stream stream = topology.newStream("spout1", spout).parallelismHint(16).each(new Fields("sentence"),
                 new Split(), new Fields("word"))
-                .window(TumblingCountWindow.of(100), mapState, new Fields("word"), new CountAsAggregator(), new Fields("count"))
-//                .aggregate(new Fields("count"), new Count(), new Fields("count-p"))
-//                .aggregate(new Fields("count-p"), new Count(), new Fields("count-aggr"))
+//                .window(TumblingCountWindow.of(1000), windowsStore, new Fields("word"), new CountAsAggregator(), new Fields("count"))
+                .tumblingTimeWindow(new BaseWindowedBolt.Duration(10, TimeUnit.SECONDS), windowsStore, new Fields("word"), new CountAsAggregator(), new Fields("count"))
                 .each(new Fields("count"), new Debug())
                 .each(new Fields("count"), new Echo(), new Fields("ct"))
                 .each(new Fields("ct"), new Debug());
@@ -103,17 +101,18 @@ public class TridentHBaseWindowingStoreTopology {
     public static void main(String[] args) throws Exception {
         Config conf = new Config();
         conf.setMaxSpoutPending(20);
+        conf.put(Config.TOPOLOGY_TRIDENT_WINDOWING_INMEMORY_CACHE_LIMIT, 2);
         System.out.println("############ Using HBase map store..");
-        // window_state table is already created with cf:tuples column
-        HBaseWindowsStoreFactory mapState = new HBaseWindowsStoreFactory(new HashMap<String, Object>(), "window_state", "cf".getBytes("UTF-8"), "tuples".getBytes("UTF-8"));
+        // window-state table should already created with cf:tuples column
+        HBaseWindowsStoreFactory mapState = new HBaseWindowsStoreFactory(new HashMap<String, Object>(), "window-state", "cf".getBytes("UTF-8"), "tuples".getBytes("UTF-8"));
 
         if (args.length == 0) {
             LocalCluster cluster = new LocalCluster();
             String topologyName = "wordCounterWithWindowing";
             cluster.submitTopology(topologyName, conf, buildTopology(mapState));
-            Utils.sleep(60 * 1000);
-            cluster.killTopology(topologyName);
-            cluster.shutdown();
+//            Utils.sleep(60 * 1000);
+//            cluster.killTopology(topologyName);
+//            cluster.shutdown();
         } else {
             conf.setNumWorkers(3);
             StormSubmitter.submitTopologyWithProgressBar(args[0], conf, buildTopology(mapState));

@@ -494,7 +494,8 @@ public class Stream implements IAggregatableStream {
      * @return
      */
     public Stream window(WindowConfig windowConfig, Fields inputFields, Aggregator aggregator, Fields functionFields) {
-        // this store is used only for storing triggered aggregated results but not tuples.
+        // this store is used only for storing triggered aggregated results but not tuples as storeTuplesInStore is set
+        // as false int he below call.
         InMemoryWindowsStoreFactory inMemoryWindowsStoreFactory = new InMemoryWindowsStoreFactory();
         return window(windowConfig, inMemoryWindowsStoreFactory, inputFields, aggregator, functionFields, false);
     }

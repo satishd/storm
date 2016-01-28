@@ -28,7 +28,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  *
@@ -40,11 +40,11 @@ public class TridentWindowManager extends BaseTridentWindowManager<TridentBatchT
 
     private final String windowTupleTaskId;
 
-    private Integer maxCachedTuplesSize;
-    private AtomicInteger currentCachedTuplesSize = new AtomicInteger();
+    private Long maxCachedTuplesSize;
+    private AtomicLong currentCachedTuplesSize = new AtomicLong();
 
     public TridentWindowManager(WindowConfig windowConfig, String windowTaskId, WindowsStore windowStore, Aggregator aggregator,
-                                BatchOutputCollector delegateCollector, Integer maxTuplesCacheSize) {
+                                BatchOutputCollector delegateCollector, Long maxTuplesCacheSize) {
         super(windowConfig, windowTaskId, windowStore, aggregator, delegateCollector);
 
         this.maxCachedTuplesSize = maxTuplesCacheSize;
@@ -59,20 +59,28 @@ public class TridentWindowManager extends BaseTridentWindowManager<TridentBatchT
         List<String> triggerKeys = new ArrayList<>();
         for (String key : allEntriesIterable) {
             if (key.startsWith(windowTupleTaskId)) {
+                System.out.println("####### windowTupleTaskId = " + windowTupleTaskId);
+                System.out.println("####### key = " + key);
                 int tupleIndexValue = lastPart(key);
                 String batchId = secondLastPart(key);
+                log.debug("Received tuple with batch [{}] and tuple index [{}]", batchId, tupleIndexValue);
+                // todo-sato remove
+                log.error("Received tuple with batch [{}] and tuple index [{}]", batchId, tupleIndexValue);
                 windowManager.add(new TridentBatchTuple(batchId, System.currentTimeMillis(), tupleIndexValue, null));
             } else if (key.startsWith(windowTriggerTaskId)) {
                 triggerKeys.add(key);
+                log.debug("Received trigger with key [{}]", key);
+                log.error("Received trigger with key [{}]", key);
             } else {
                 log.warn("Ignoring unknown primary key entry from windows store [{}]", key);
             }
         }
 
-        // get trigger values
+        // get trigger values only if they have more than zero
         Iterable<Object> triggerObjects = windowStore.get(triggerKeys);
         int i=0;
         for (Object triggerObject : triggerObjects) {
+            log.error("Received trigger value [{}]", triggerObject);
             pendingTriggers.add(new TriggerResult(lastPart(triggerKeys.get(i++)), (List<List<Object>>) triggerObject));
         }
 
@@ -83,7 +91,7 @@ public class TridentWindowManager extends BaseTridentWindowManager<TridentBatchT
         if (lastSepIndex < 0) {
             throw new IllegalArgumentException("primaryKey does not have key separator '" + WindowsStore.KEY_SEPARATOR + "'");
         }
-        return Integer.parseInt(key.substring(lastSepIndex));
+        return Integer.parseInt(key.substring(lastSepIndex+1));
     }
 
     private String secondLastPart(String key) {
@@ -108,20 +116,30 @@ public class TridentWindowManager extends BaseTridentWindowManager<TridentBatchT
         }
 
         log.debug("Adding tuples to window-manager for batch: ", batchId);
+        List<WindowsStore.Entry> entries = new ArrayList<>();
         for (int i = 0; i < tuples.size(); i++) {
             String key = keyOf(batchId);
             TridentTuple tridentTuple = tuples.get(i);
-            windowStore.put(key+i, tridentTuple);
+            entries.add(new WindowsStore.Entry(key+i, tridentTuple));
+        }
+
+        // tuples should be available in store before they are added to window manager
+        windowStore.putAll(entries);
+        for (int i = 0; i < tuples.size(); i++) {
+            String key = keyOf(batchId);
+            TridentTuple tridentTuple = tuples.get(i);
             addToWindowManager(i, key, tridentTuple);
         }
+
     }
 
-    private void addToWindowManager(int tupleIndex, String batchTxnId, TridentTuple tridentTuple) {
+    private void addToWindowManager(int tupleIndex, String effectiveBatchId, TridentTuple tridentTuple) {
         TridentTuple actualTuple = null;
         if (maxCachedTuplesSize == null || currentCachedTuplesSize.get() < maxCachedTuplesSize) {
             actualTuple = tridentTuple;
         }
-        windowManager.add(new TridentBatchTuple(batchTxnId, System.currentTimeMillis(), tupleIndex, actualTuple));
+        currentCachedTuplesSize.incrementAndGet();
+        windowManager.add(new TridentBatchTuple(effectiveBatchId, System.currentTimeMillis(), tupleIndex, actualTuple));
     }
 
     public String getBatchTxnId(Object batchId) {
@@ -146,7 +164,7 @@ public class TridentWindowManager extends BaseTridentWindowManager<TridentBatchT
         }
 
         if(keys.size() > 0) {
-            Iterable<?> storedTuples = windowStore.get(keys);
+            Iterable<Object> storedTuples = windowStore.get(keys);
             for (Object storedTuple : storedTuples) {
                 resultTuples.add((TridentTuple) storedTuple);
             }
@@ -173,11 +191,11 @@ public class TridentWindowManager extends BaseTridentWindowManager<TridentBatchT
             keys.add(tupleKey(expiredTuple));
         }
 
-        windowStore.removeAll(keys);
+//        windowStore.removeAll(keys);
     }
 
     private String tupleKey(TridentBatchTuple tridentBatchTuple) {
-        return tridentBatchTuple.batchId + String.valueOf(tridentBatchTuple.tupleIndex);
+        return tridentBatchTuple.effectiveBatchId + tridentBatchTuple.tupleIndex;
     }
 
 }

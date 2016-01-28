@@ -21,6 +21,7 @@ package org.apache.storm.trident.windowing;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Enumeration;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
@@ -77,16 +78,16 @@ public class InMemoryWindowsStore implements WindowsStore, Serializable {
             return backingStore.getAllKeys();
         }
 
-        final Iterator<String> storeIterator = store.keySet().iterator();
+        final Enumeration<String> storeEnumeration = store.keys();
         final Iterator<String> resultIterator = new Iterator<String>() {
             @Override
             public boolean hasNext() {
-                return storeIterator.hasNext();
+                return storeEnumeration.hasMoreElements();
             }
 
             @Override
             public String next() {
-                return  storeIterator.next();
+                return  storeEnumeration.nextElement();
             }
 
             @Override

@@ -46,6 +46,7 @@ public class WindowTridentProcessor implements TridentProcessor {
     private static final Logger log = LoggerFactory.getLogger(WindowTridentProcessor.class);
 
     public static final String TRIGGER_FIELD_NAME = "_task_info";
+    public static final long DEFAULT_INMEMORY_TUPLE_CACHE_LIMIT = 100l;
 
     private final String windowId;
     private final Fields inputFields;
@@ -82,7 +83,7 @@ public class WindowTridentProcessor implements TridentProcessor {
             throw new RuntimeException("Aggregation related operation can only have one parent");
         }
 
-        Integer maxTuplesCacheSize = getWindowTuplesCacheSize(conf);
+        Long maxTuplesCacheSize = getWindowTuplesCacheSize(conf);
 
         this.tridentContext = tridentContext;
         collector = new FreshCollector(tridentContext);
@@ -91,13 +92,15 @@ public class WindowTridentProcessor implements TridentProcessor {
         tridentWindowManager = storeTuplesInStore ?
                 new TridentWindowManager(windowConfig, windowTaskId, windowStoreFactory.create(), aggregator, tridentContext.getDelegateCollector(), maxTuplesCacheSize)
                 : new InMemoryTridentWindowManager(windowConfig, windowTaskId, windowStoreFactory.create(), aggregator, tridentContext.getDelegateCollector());
+
+        tridentWindowManager.prepare();
     }
 
-    private Integer getWindowTuplesCacheSize(Map conf) {
+    private Long getWindowTuplesCacheSize(Map conf) {
         if(conf.containsKey(Config.TOPOLOGY_TRIDENT_WINDOWING_INMEMORY_CACHE_LIMIT)) {
-            return (Integer) conf.get(Config.TOPOLOGY_TRIDENT_WINDOWING_INMEMORY_CACHE_LIMIT);
+            return ((Number) conf.get(Config.TOPOLOGY_TRIDENT_WINDOWING_INMEMORY_CACHE_LIMIT)).longValue();
         }
-        return null;
+        return DEFAULT_INMEMORY_TUPLE_CACHE_LIMIT;
     }
 
     @Override

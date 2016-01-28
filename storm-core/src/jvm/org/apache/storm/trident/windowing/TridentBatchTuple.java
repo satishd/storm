@@ -24,17 +24,17 @@ import org.apache.storm.trident.tuple.TridentTuple;
  *
  */
 public class TridentBatchTuple {
-    final String batchId;
+    final String effectiveBatchId;
     final long timeStamp;
     final int tupleIndex;
     final TridentTuple tridentTuple;
 
-    public TridentBatchTuple(String batchId, long timeStamp, int tupleIndex) {
-        this(batchId, timeStamp, tupleIndex, null);
+    public TridentBatchTuple(String effectiveBatchId, long timeStamp, int tupleIndex) {
+        this(effectiveBatchId, timeStamp, tupleIndex, null);
     }
 
-    public TridentBatchTuple(String batchId, long timeStamp, int tupleIndex, TridentTuple tridentTuple) {
-        this.batchId = batchId;
+    public TridentBatchTuple(String effectiveBatchId, long timeStamp, int tupleIndex, TridentTuple tridentTuple) {
+        this.effectiveBatchId = effectiveBatchId;
         this.timeStamp = timeStamp;
         this.tupleIndex = tupleIndex;
         this.tridentTuple = tridentTuple;

@@ -8,16 +8,17 @@ import com.google.common.base.Preconditions;
 import java.io.Serializable;
 import java.util.Collection;
 import java.util.List;
-import java.util.Map;
 
 /**
  *
  */
 public interface WindowsStore extends Serializable {
 
+    public static final String KEY_SEPARATOR = "|";
+
     public Object get(Key key);
 
-    Iterable<Object> get(List<Key> keys);
+    public Iterable<Object> get(List<Key> keys);
 
     public Iterable<WindowsStore.Entry> getAllKeys();
 

@@ -46,7 +46,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 public abstract class BaseTridentWindowManager<T> implements ITridentWindowManager<T> {
     private static final Logger log = LoggerFactory.getLogger(BaseTridentWindowManager.class);
 
-    public static final String TRIGGER_PREFIX = "tr" + WindowTridentProcessor.KEY_SEPARATOR;
+    public static final String TRIGGER_PREFIX = "tr" + WindowsStore.KEY_SEPARATOR;
+    public static final String TRIGGER_COUNT_PREFIX = "tc" + WindowsStore.KEY_SEPARATOR;
 
     protected final WindowManager<T> windowManager;
     protected final Aggregator aggregator;
@@ -57,6 +58,7 @@ public abstract class BaseTridentWindowManager<T> implements ITridentWindowManag
     protected final Set<String> activeBatches = new HashSet<>();
     protected final Queue<TriggerResult> pendingTriggers = new ConcurrentLinkedQueue<>();
     protected final AtomicInteger triggerId = new AtomicInteger();
+    private final String windowTriggerCountId;
 
 
     public BaseTridentWindowManager(WindowConfig windowConfig, String windowTaskId, WindowsStore windowStore, Aggregator aggregator,
@@ -66,6 +68,7 @@ public abstract class BaseTridentWindowManager<T> implements ITridentWindowManag
         this.delegateCollector = delegateCollector;
 
         windowTriggerTaskId = TRIGGER_PREFIX + windowTaskId;
+        windowTriggerCountId = TRIGGER_COUNT_PREFIX + windowTaskId;
         windowManager = new WindowManager<>(new TridentWindowLifeCycleListener());
 
         WindowStrategyFactory<T> windowStrategyFactory = new WindowStrategyFactory<>();
@@ -74,6 +77,13 @@ public abstract class BaseTridentWindowManager<T> implements ITridentWindowManag
         windowManager.setEvictionPolicy(evictionPolicy);
         TriggerPolicy<T> triggerPolicy = windowStrategy.getTriggerPolicy(windowManager, evictionPolicy);
         windowManager.setTriggerPolicy(triggerPolicy);
+    }
+
+    @Override
+    public void prepare() {
+        // get trigger count value from store
+        Object result = windowStore.get(new WindowsStore.Key(windowTriggerCountId, ""));
+        triggerId.set((Integer) result);
     }
 
     class TridentWindowLifeCycleListener implements WindowLifecycleListener<T> {

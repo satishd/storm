@@ -46,7 +46,6 @@ public class WindowTridentProcessor implements TridentProcessor {
     private static final Logger log = LoggerFactory.getLogger(WindowTridentProcessor.class);
 
     public static final String TRIGGER_FIELD_NAME = "_task_info";
-    static final String KEY_SEPARATOR = "|";
 
     private final String windowId;
     private final Fields inputFields;
@@ -88,7 +87,7 @@ public class WindowTridentProcessor implements TridentProcessor {
         this.tridentContext = tridentContext;
         collector = new FreshCollector(tridentContext);
         projection = new TridentTupleView.ProjectionFactory(parents.get(0), inputFields);
-        String windowTaskId = windowId + KEY_SEPARATOR + topologyContext.getThisTaskId() + KEY_SEPARATOR;
+        String windowTaskId = windowId + WindowsStore.KEY_SEPARATOR + topologyContext.getThisTaskId() + WindowsStore.KEY_SEPARATOR;
         tridentWindowManager = storeTuplesInStore ?
                 new TridentWindowManager(windowConfig, windowTaskId, windowStoreFactory.create(windowTaskId), aggregator, tridentContext.getDelegateCollector(), maxTuplesCacheSize)
                 : new InMemoryTridentWindowManager(windowConfig, windowTaskId, windowStoreFactory.create(windowTaskId), aggregator, tridentContext.getDelegateCollector());

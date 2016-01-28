@@ -36,7 +36,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class TridentWindowManager extends BaseTridentWindowManager<TridentBatchTuple> {
     private static final Logger log = LoggerFactory.getLogger(TridentWindowManager.class);
 
-    private static final String TUPLE_PREFIX = "tu" + WindowTridentProcessor.KEY_SEPARATOR;
+    private static final String TUPLE_PREFIX = "tu" + WindowsStore.KEY_SEPARATOR;
 
     private final String windowTupleTaskId;
 
@@ -53,29 +53,37 @@ public class TridentWindowManager extends BaseTridentWindowManager<TridentBatchT
     }
 
     public void prepare() {
+        super.prepare();
         // get existing tuples and pending triggers for this operator-component/task and add them to WindowManager
         Iterable<WindowsStore.Entry> allEntriesIterable = windowStore.getAllKeys();
         //todo-sato how to maintain uniqueness in generating trigger keys so that there will be no overlaps between task restarts.
         // oneway to do that may be store get existing server restart count and increment it when a task is prepared.
-        List<String> triggerKeys = new ArrayList<>();
+        List<WindowsStore.Key> triggerKeys = new ArrayList<>();
         for (WindowsStore.Entry entry : allEntriesIterable) {
             String primaryKey = entry.key.primaryKey;
-            if (primaryKey.startsWith(TUPLE_PREFIX)) {
+            if (primaryKey.startsWith(windowTupleTaskId)) {
                 String batchId = batchIdFromPrimaryKey(primaryKey);
                 windowManager.add(new TridentBatchTuple(batchId, System.currentTimeMillis(), Integer.valueOf(entry.key.secondaryKey), null));
-            } else if (primaryKey.startsWith(TRIGGER_PREFIX)) {
-                triggerKeys.add(primaryKey);
+            } else if (primaryKey.startsWith(windowTriggerTaskId)) {
+                triggerKeys.add(entry.key);
             } else {
                 log.warn("Ignoring unknown primary key entry from windows store [{}]", primaryKey);
             }
         }
 
+        // get trigger values
+        Iterable<Object> triggerObjects = windowStore.get(triggerKeys);
+        int i=0;
+        for (Object triggerObject : triggerObjects) {
+            pendingTriggers.add(new TriggerResult(Integer.parseInt(triggerKeys.get(i++).secondaryKey), (List<List<Object>>) triggerObject));
+        }
+
     }
 
     private String batchIdFromPrimaryKey(String primaryKey) {
-        int lastSepIndex = primaryKey.lastIndexOf(WindowTridentProcessor.KEY_SEPARATOR);
+        int lastSepIndex = primaryKey.lastIndexOf(WindowsStore.KEY_SEPARATOR);
         if (lastSepIndex < 0) {
-            throw new IllegalArgumentException("primaryKey does not have key separator '" + WindowTridentProcessor.KEY_SEPARATOR + "'");
+            throw new IllegalArgumentException("primaryKey does not have key separator '" + WindowsStore.KEY_SEPARATOR + "'");
         }
         return primaryKey.substring(lastSepIndex);
     }
@@ -112,7 +120,7 @@ public class TridentWindowManager extends BaseTridentWindowManager<TridentBatchT
     }
 
     public String keyOf(Object batchId) {
-        return windowTupleTaskId + WindowTridentProcessor.KEY_SEPARATOR + getBatchTxnId(batchId);
+        return windowTupleTaskId + WindowsStore.KEY_SEPARATOR + getBatchTxnId(batchId);
     }
 
     public List<TridentTuple> getTridentTuples(List<TridentBatchTuple> tridentBatchTuples) {
@@ -140,7 +148,6 @@ public class TridentWindowManager extends BaseTridentWindowManager<TridentBatchT
             return tridentBatchTuple.tridentTuple;
         }
         keys.add(tupleKey(tridentBatchTuple));
-//        return (TridentTuple) windowStore.get(tupleKey(tridentBatchTuple));
         return null;
     }
 

@@ -42,6 +42,7 @@ public class InMemoryTridentWindowManager extends BaseTridentWindowManager<Tride
 
     @Override
     public void prepare() {
+        super.prepare();
         log.debug("InMemoryTridentWindowManager.prepare");
     }
 

@@ -126,14 +126,15 @@ public class TridentWindowingInmemoryStoreTopology {
 
     public static void main(String[] args) throws Exception {
         Config conf = new Config();
-        conf.setMaxSpoutPending(20);
+//        conf.setMaxSpoutPending(100);
         WindowsStoreFactory mapState = new InMemoryWindowsStoreFactory();
         System.out.println("############ Using inmemory store..");
 
         if (args.length == 0) {
-            List<? extends WindowConfig> list = Arrays.asList(SlidingCountWindow.of(1000, 100), TumblingCountWindow.of(1000),
-                    SlidingDurationWindow.of(new BaseWindowedBolt.Duration(6, TimeUnit.SECONDS), new BaseWindowedBolt.Duration(3, TimeUnit.SECONDS)),
-                    TumblingDurationWindow.of(new BaseWindowedBolt.Duration(5, TimeUnit.SECONDS)));
+            List<? extends WindowConfig> list = Arrays.asList(
+//                    SlidingCountWindow.of(1000, 100), TumblingCountWindow.of(1000),
+//                    SlidingDurationWindow.of(new BaseWindowedBolt.Duration(6, TimeUnit.SECONDS), new BaseWindowedBolt.Duration(3, TimeUnit.SECONDS)),
+                    TumblingDurationWindow.of(new BaseWindowedBolt.Duration(3, TimeUnit.SECONDS)));
 
             for (WindowConfig windowConfig : list) {
                 LocalCluster cluster = new LocalCluster();
@@ -144,7 +145,8 @@ public class TridentWindowingInmemoryStoreTopology {
             System.exit(1);
         } else {
             conf.setNumWorkers(3);
-            StormSubmitter.submitTopologyWithProgressBar(args[0], conf, buildTopology(mapState, SlidingCountWindow.of(1000, 100)));
+//            StormSubmitter.submitTopologyWithProgressBar(args[0], conf, buildTopology(mapState, SlidingCountWindow.of(1000, 100)));
+            StormSubmitter.submitTopologyWithProgressBar(args[0], conf, buildTopology(mapState, TumblingDurationWindow.of(new BaseWindowedBolt.Duration(3, TimeUnit.SECONDS))));
         }
     }
 

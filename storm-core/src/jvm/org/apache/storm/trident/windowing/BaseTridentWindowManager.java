@@ -125,6 +125,7 @@ public abstract class BaseTridentWindowManager<T> implements ITridentWindowManag
         aggregator.complete(state, collector);
 
         List<List<Object>> resultantAggregatedValue = collector.values;
+        windowStore.put(windowTriggerCountId, currentTriggerId+1);
         windowStore.put(triggerKey(currentTriggerId), resultantAggregatedValue);
         pendingTriggers.add(new TriggerResult(currentTriggerId, resultantAggregatedValue));
     }

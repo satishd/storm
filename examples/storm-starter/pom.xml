@@ -94,7 +94,7 @@
         For IntelliJ dev, intellij will load properly.
       -->
         <!-- todo-sato uncomment the below before raising PR -->
-        <!--<scope>${provided.scope}</scope>-->
+        <scope>${provided.scope}</scope>
     </dependency>
       <dependency>
           <groupId>org.apache.storm</groupId>

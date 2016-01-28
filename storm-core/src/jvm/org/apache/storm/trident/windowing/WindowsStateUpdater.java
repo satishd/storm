@@ -51,10 +51,10 @@ public class WindowsStateUpdater implements StateUpdater<WindowsState> {
         for (TridentTuple tuple : tuples) {
             try {
                 Object fieldValue = tuple.getValueByField(WindowTridentProcessor.TRIGGER_FIELD_NAME);
-                if(! (fieldValue instanceof WindowsStore.Key)) {
-                    throw new IllegalClassException(WindowsStore.Key.class, fieldValue.getClass());
+                if(! (fieldValue instanceof String)) {
+                    throw new IllegalClassException(String.class, fieldValue.getClass());
                 }
-                WindowsStore.Key triggerKeyFieldValue = (WindowsStore.Key) fieldValue;
+                String triggerKeyFieldValue = (String) fieldValue;
                 log.error("Removing trigger key {} from store: {}", triggerKeyFieldValue, windowsStore);
                 windowsStore.remove(triggerKeyFieldValue);
             } catch (Exception ex) {

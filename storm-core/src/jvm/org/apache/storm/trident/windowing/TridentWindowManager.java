@@ -58,16 +58,17 @@ public class TridentWindowManager extends BaseTridentWindowManager<TridentBatchT
         Iterable<WindowsStore.Entry> allEntriesIterable = windowStore.getAllKeys();
         //todo-sato how to maintain uniqueness in generating trigger keys so that there will be no overlaps between task restarts.
         // oneway to do that may be store get existing server restart count and increment it when a task is prepared.
-        List<WindowsStore.Key> triggerKeys = new ArrayList<>();
+        List<String> triggerKeys = new ArrayList<>();
         for (WindowsStore.Entry entry : allEntriesIterable) {
-            String primaryKey = entry.key.primaryKey;
-            if (primaryKey.startsWith(windowTupleTaskId)) {
-                String batchId = batchIdFromPrimaryKey(primaryKey);
-                windowManager.add(new TridentBatchTuple(batchId, System.currentTimeMillis(), Integer.valueOf(entry.key.secondaryKey), null));
-            } else if (primaryKey.startsWith(windowTriggerTaskId)) {
+            String key = entry.key;
+            if (key.startsWith(windowTupleTaskId)) {
+                int tupleIndexValue = lastPart(key);
+                String batchId = secondLastPart(key);
+                windowManager.add(new TridentBatchTuple(batchId, System.currentTimeMillis(), tupleIndexValue, null));
+            } else if (key.startsWith(windowTriggerTaskId)) {
                 triggerKeys.add(entry.key);
             } else {
-                log.warn("Ignoring unknown primary key entry from windows store [{}]", primaryKey);
+                log.warn("Ignoring unknown primary key entry from windows store [{}]", key);
             }
         }
 
@@ -75,17 +76,31 @@ public class TridentWindowManager extends BaseTridentWindowManager<TridentBatchT
         Iterable<Object> triggerObjects = windowStore.get(triggerKeys);
         int i=0;
         for (Object triggerObject : triggerObjects) {
-            pendingTriggers.add(new TriggerResult(Integer.parseInt(triggerKeys.get(i++).secondaryKey), (List<List<Object>>) triggerObject));
+            pendingTriggers.add(new TriggerResult(lastPart(triggerKeys.get(i++)), (List<List<Object>>) triggerObject));
         }
 
     }
 
-    private String batchIdFromPrimaryKey(String primaryKey) {
-        int lastSepIndex = primaryKey.lastIndexOf(WindowsStore.KEY_SEPARATOR);
+    private int lastPart(String key) {
+        int lastSepIndex = key.lastIndexOf(WindowsStore.KEY_SEPARATOR);
         if (lastSepIndex < 0) {
             throw new IllegalArgumentException("primaryKey does not have key separator '" + WindowsStore.KEY_SEPARATOR + "'");
         }
-        return primaryKey.substring(lastSepIndex);
+        return Integer.parseInt(key.substring(lastSepIndex));
+    }
+
+    private String secondLastPart(String key) {
+        int lastSepIndex = key.lastIndexOf(WindowsStore.KEY_SEPARATOR);
+        if (lastSepIndex < 0) {
+            throw new IllegalArgumentException("key "+key+" does not have key separator '" + WindowsStore.KEY_SEPARATOR + "'");
+        }
+        String trimKey = key.substring(0, lastSepIndex);
+        int secondLastSepIndex = trimKey.lastIndexOf(WindowsStore.KEY_SEPARATOR);
+        if (lastSepIndex < 0) {
+            throw new IllegalArgumentException("key "+key+" does not have second key separator '" + WindowsStore.KEY_SEPARATOR + "'");
+        }
+
+        return key.substring(secondLastSepIndex+1, lastSepIndex);
     }
 
     public void addTuplesBatch(Object batchId, List<TridentTuple> tuples) {
@@ -97,10 +112,10 @@ public class TridentWindowManager extends BaseTridentWindowManager<TridentBatchT
 
         log.debug("Adding tuples to window-manager for batch: ", batchId);
         for (int i = 0; i < tuples.size(); i++) {
-            String primaryKey = keyOf(batchId);
+            String key = keyOf(batchId);
             TridentTuple tridentTuple = tuples.get(i);
-            windowStore.put(new WindowsStore.Key(primaryKey, String.valueOf(i)), tridentTuple);
-            addToWindowManager(i, primaryKey, tridentTuple);
+            windowStore.put(key+i, tridentTuple);
+            addToWindowManager(i, key, tridentTuple);
         }
     }
 
@@ -120,12 +135,12 @@ public class TridentWindowManager extends BaseTridentWindowManager<TridentBatchT
     }
 
     public String keyOf(Object batchId) {
-        return windowTupleTaskId + WindowsStore.KEY_SEPARATOR + getBatchTxnId(batchId);
+        return windowTupleTaskId + getBatchTxnId(batchId) + WindowsStore.KEY_SEPARATOR;
     }
 
     public List<TridentTuple> getTridentTuples(List<TridentBatchTuple> tridentBatchTuples) {
         List<TridentTuple> resultTuples = new ArrayList<>();
-        List<WindowsStore.Key> keys = new ArrayList<>();
+        List<String> keys = new ArrayList<>();
         for (TridentBatchTuple tridentBatchTuple : tridentBatchTuples) {
             TridentTuple tuple = collectTridentTupleOrKey(tridentBatchTuple, keys);
             if(tuple != null) {
@@ -143,7 +158,7 @@ public class TridentWindowManager extends BaseTridentWindowManager<TridentBatchT
         return resultTuples;
     }
 
-    public TridentTuple collectTridentTupleOrKey(TridentBatchTuple tridentBatchTuple, List<WindowsStore.Key> keys) {
+    public TridentTuple collectTridentTupleOrKey(TridentBatchTuple tridentBatchTuple, List<String> keys) {
         if (tridentBatchTuple.tridentTuple != null) {
             return tridentBatchTuple.tridentTuple;
         }
@@ -156,7 +171,7 @@ public class TridentWindowManager extends BaseTridentWindowManager<TridentBatchT
             currentCachedTuplesSize.addAndGet(-expiredTuples.size());
         }
 
-        List<WindowsStore.Key> keys = new ArrayList<>();
+        List<String> keys = new ArrayList<>();
         for (TridentBatchTuple expiredTuple : expiredTuples) {
             keys.add(tupleKey(expiredTuple));
         }
@@ -164,8 +179,8 @@ public class TridentWindowManager extends BaseTridentWindowManager<TridentBatchT
         windowStore.removeAll(keys);
     }
 
-    private WindowsStore.Key tupleKey(TridentBatchTuple tridentBatchTuple) {
-        return new WindowsStore.Key(tridentBatchTuple.batchId, String.valueOf(tridentBatchTuple.tupleIndex));
+    private String tupleKey(TridentBatchTuple tridentBatchTuple) {
+        return tridentBatchTuple.batchId + String.valueOf(tridentBatchTuple.tupleIndex);
     }
 
 }

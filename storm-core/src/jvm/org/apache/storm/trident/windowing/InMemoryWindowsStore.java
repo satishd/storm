@@ -21,7 +21,6 @@ package org.apache.storm.trident.windowing;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -33,7 +32,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public class InMemoryWindowsStore implements WindowsStore, Serializable {
 
-    private final ConcurrentHashMap<String, Map<String, Object>> primaryKeyStore = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, Object> store = new ConcurrentHashMap<>();
 
     private int maxSize;
     private AtomicInteger currentSize;
@@ -54,12 +53,8 @@ public class InMemoryWindowsStore implements WindowsStore, Serializable {
     }
 
     @Override
-    public Object get(Key key) {
-        Object value = null;
-        Map<String, Object> primaryKeyContainer = primaryKeyStore.get(key.primaryKey);
-        if(primaryKeyContainer != null) {
-            value = primaryKeyContainer.get(key.secondaryKey);
-        }
+    public Object get(String key) {
+        Object value = store.get(key);
 
         if(value == null && backingStore != null) {
             value = backingStore.get(key);
@@ -69,9 +64,9 @@ public class InMemoryWindowsStore implements WindowsStore, Serializable {
     }
 
     @Override
-    public Iterable<Object> get(List<Key> keys) {
+    public Iterable<Object> get(List<String> keys) {
         List<Object> values = new ArrayList<>();
-        for (Key key : keys) {
+        for (String key : keys) {
             values.add(get(key));
         }
         return values;
@@ -83,7 +78,7 @@ public class InMemoryWindowsStore implements WindowsStore, Serializable {
             return backingStore.getAllKeys();
         }
 
-        final Iterator<Map.Entry<String, Map<String, Object>>> storeIterator = primaryKeyStore.entrySet().iterator();
+        final Iterator<Map.Entry<String, Object>> storeIterator = store.entrySet().iterator();
         final Iterator<WindowsStore.Entry> resultIterator = new Iterator<WindowsStore.Entry>() {
             @Override
             public boolean hasNext() {
@@ -92,10 +87,8 @@ public class InMemoryWindowsStore implements WindowsStore, Serializable {
 
             @Override
             public WindowsStore.Entry next() {
-                // todo-sato implement this!
-                Map.Entry<String, Map<String, Object>> next = storeIterator.next();
-//                next.getValue().entrySet()
-                return null;
+                Map.Entry<String, Object> entry = storeIterator.next();
+                return new Entry(entry.getKey(), entry.getValue());
             }
 
             @Override
@@ -113,7 +106,7 @@ public class InMemoryWindowsStore implements WindowsStore, Serializable {
     }
 
     @Override
-    public void put(Key key, Object value) {
+    public void put(String key, Object value) {
         _put(key, value);
 
         if(backingStore != null) {
@@ -121,17 +114,12 @@ public class InMemoryWindowsStore implements WindowsStore, Serializable {
         }
     }
 
-    private void _put(Key key, Object value) {
+    private void _put(String key, Object value) {
         if(!canAdd()) {
             return;
         }
 
-        Map<String, Object> primaryKeyContainer = primaryKeyStore.get(key.primaryKey);
-        if(primaryKeyContainer == null) {
-            primaryKeyContainer = new ConcurrentHashMap<>();
-            primaryKeyStore.put(key.primaryKey, primaryKeyContainer);
-        }
-        primaryKeyContainer.put(key.secondaryKey, value);
+        store.put(key, value);
         incrementCurrentSize();
     }
 
@@ -156,7 +144,7 @@ public class InMemoryWindowsStore implements WindowsStore, Serializable {
     }
 
     @Override
-    public void remove(Key key) {
+    public void remove(String key) {
         _remove(key);
 
         if(backingStore != null) {
@@ -164,18 +152,16 @@ public class InMemoryWindowsStore implements WindowsStore, Serializable {
         }
     }
 
-    private void _remove(Key key) {
-        Map<String, Object> primaryKeyContainer = primaryKeyStore.get(key.primaryKey);
-        if(primaryKeyContainer == null && backingStore == null) {
-            throw new IllegalStateException("no value exists for given key's primary-key");
+    private void _remove(String key) {
+        Object oldValue = store.remove(key);
+
+        if(oldValue != null) {
+            decrementSize();
+            if(backingStore != null) {
+                backingStore.remove(key);
+            }
         }
 
-        if(primaryKeyContainer.remove(key.secondaryKey) != null) {
-            decrementSize();
-        };
-        if(primaryKeyContainer.isEmpty()) {
-            primaryKeyStore.remove(key.primaryKey, Collections.emptyMap());
-        }
     }
 
     private void decrementSize() {
@@ -185,8 +171,8 @@ public class InMemoryWindowsStore implements WindowsStore, Serializable {
     }
 
     @Override
-    public void removeAll(Collection<Key> keys) {
-        for (Key key : keys) {
+    public void removeAll(Collection<String> keys) {
+        for (String key : keys) {
             _remove(key);
         }
 
@@ -197,7 +183,7 @@ public class InMemoryWindowsStore implements WindowsStore, Serializable {
 
     @Override
     public void shutdown() {
-        primaryKeyStore.clear();
+        store.clear();
 
         if(backingStore != null) {
             backingStore.shutdown();
@@ -207,7 +193,7 @@ public class InMemoryWindowsStore implements WindowsStore, Serializable {
     @Override
     public String toString() {
         return "InMemoryWindowsStore{" +
-                " primaryKeyStore:size = " + primaryKeyStore.size() +
+                " store:size = " + store.size() +
                 " backingStore = " + backingStore +
                 '}';
     }

@@ -27,7 +27,6 @@ import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
-import org.apache.hadoop.hbase.client.ResultScanner;
 import org.apache.hadoop.hbase.client.RetriesExhaustedWithDetailsException;
 import org.apache.hadoop.hbase.client.Scan;
 import org.apache.storm.trident.windowing.WindowsStore;
@@ -43,7 +42,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 
 /**
  *
@@ -83,30 +81,24 @@ public class HBaseWindowsStore implements WindowsStore {
         return effectiveKey;
     }
 
-    private byte[] effectiveKey(Key key) {
+    private byte[] effectiveKey(String key) {
         try {
-            return (key.primaryKey + "|" + key.secondaryKey).getBytes(UTF_8);
+            return key.getBytes(UTF_8);
         } catch (UnsupportedEncodingException e) {
             throw new RuntimeException(e);
         }
     }
 
-    private Key createKey(byte[] bytes) {
+    private String createKey(byte[] bytes) {
         try {
-            String string = new String(bytes, UTF_8);
-            int index = string.lastIndexOf("|");
-            if(index == -1) {
-                throw new RuntimeException("Invalid key without a separator");
-            }
-            return new Key(string.substring(0, index), string.substring(index+1));
+            return new String(bytes, UTF_8);
         } catch (UnsupportedEncodingException e) {
             throw new RuntimeException(e);
         }
-
     }
 
     @Override
-    public Object get(Key key) {
+    public Object get(String key) {
         WindowsStore.Entry.nonNullCheckForKey(key);
 
         byte[] effectiveKey = effectiveKey(key);
@@ -130,9 +122,9 @@ public class HBaseWindowsStore implements WindowsStore {
     }
 
     @Override
-    public Iterable<Object> get(List<Key> keys) {
+    public Iterable<Object> get(List<String> keys) {
         List<Get> gets = new ArrayList<>();
-        for (Key key : keys) {
+        for (String key : keys) {
             WindowsStore.Entry.nonNullCheckForKey(key);
 
             byte[] effectiveKey = effectiveKey(key);
@@ -186,7 +178,7 @@ public class HBaseWindowsStore implements WindowsStore {
                 Result result = resultIterator.next();
                 Input input = new Input(result.getValue(family, qualifier));
                 Object value = kryo.readClassAndObject(input);
-                Key key = createKey(result.getRow());
+                String key = createKey(result.getRow());
                 return new WindowsStore.Entry(key, value);
             }
 
@@ -205,7 +197,7 @@ public class HBaseWindowsStore implements WindowsStore {
     }
 
     @Override
-    public void put(Key key, Object value) {
+    public void put(String key, Object value) {
         WindowsStore.Entry.nonNullCheckForKey(key);
         WindowsStore.Entry.nonNullCheckForValue(value);
 
@@ -243,7 +235,7 @@ public class HBaseWindowsStore implements WindowsStore {
     }
 
     @Override
-    public void remove(Key key) {
+    public void remove(String key) {
         WindowsStore.Entry.nonNullCheckForKey(key);
 
         Delete delete = new Delete(effectiveKey(key));
@@ -255,9 +247,9 @@ public class HBaseWindowsStore implements WindowsStore {
     }
 
     @Override
-    public void removeAll(Collection<Key> keys) {
+    public void removeAll(Collection<String> keys) {
         List<Delete> deleteBatch = new ArrayList<>();
-        for (Key key : keys) {
+        for (String key : keys) {
             WindowsStore.Entry.nonNullCheckForKey(key);
 
             Delete delete = new Delete(effectiveKey(key));

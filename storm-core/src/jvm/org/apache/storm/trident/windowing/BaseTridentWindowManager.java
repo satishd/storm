@@ -82,8 +82,15 @@ public abstract class BaseTridentWindowManager<T> implements ITridentWindowManag
     @Override
     public void prepare() {
         // get trigger count value from store
-        Object result = windowStore.get(new WindowsStore.Key(windowTriggerCountId, ""));
-        triggerId.set((Integer) result);
+        Object result = windowStore.get(windowTriggerCountId);
+        Integer currentCount = 0;
+        if(result == null) {
+            log.info("No current trigger count in windows store.");
+        } else {
+            currentCount = (Integer) result + 1;
+        }
+        windowStore.put(windowTriggerCountId, currentCount);
+        triggerId.set(currentCount);
     }
 
     class TridentWindowLifeCycleListener implements WindowLifecycleListener<T> {
@@ -123,8 +130,8 @@ public abstract class BaseTridentWindowManager<T> implements ITridentWindowManag
 
     protected abstract List<TridentTuple> getTridentTuples(List<T> tupleEvents);
 
-    public WindowsStore.Key triggerKey(Integer currentTriggerId) {
-        return new WindowsStore.Key(windowTriggerTaskId, currentTriggerId.toString());
+    public String triggerKey(Integer currentTriggerId) {
+        return windowTriggerTaskId + currentTriggerId;
     }
 
     static class AccumulatedTuplesCollector implements TridentCollector {

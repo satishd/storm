@@ -60,7 +60,7 @@ public class TridentHBaseWindowingStoreTopology {
         Stream stream = topology.newStream("spout1", spout).parallelismHint(16).each(new Fields("sentence"),
                 new Split(), new Fields("word"))
 //                .window(TumblingCountWindow.of(1000), windowsStore, new Fields("word"), new CountAsAggregator(), new Fields("count"))
-                .tumblingTimeWindow(new BaseWindowedBolt.Duration(10, TimeUnit.SECONDS), windowsStore, new Fields("word"), new CountAsAggregator(), new Fields("count"))
+                .tumblingTimeWindow(new BaseWindowedBolt.Duration(3, TimeUnit.SECONDS), windowsStore, new Fields("word"), new CountAsAggregator(), new Fields("count"))
                 .each(new Fields("count"), new Debug())
                 .each(new Fields("count"), new Echo(), new Fields("ct"))
                 .each(new Fields("ct"), new Debug());

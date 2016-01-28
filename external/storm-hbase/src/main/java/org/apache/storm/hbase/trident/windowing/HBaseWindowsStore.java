@@ -51,20 +51,29 @@ public class HBaseWindowsStore implements WindowsStore {
     private static final Logger log = LoggerFactory.getLogger(HBaseWindowsStore.class);
     public static final String UTF_8 = "utf-8";
 
-    private final HTable htable;
-    private byte[] family;
-    private byte[] qualifier;
+    private final ThreadLocal<HTable> threadLocalHtable;
+    private final byte[] family;
+    private final byte[] qualifier;
 
-    public HBaseWindowsStore(Configuration config, String tableName, byte[] family, byte[] qualifier) {
+    public HBaseWindowsStore(final Configuration config, final String tableName, byte[] family, byte[] qualifier) {
         this.family = family;
         this.qualifier = qualifier;
 
-        try {
-            htable = new HTable(config, tableName);
-            htable.setAutoFlush(true, true);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+        threadLocalHtable = new ThreadLocal<HTable>() {
+            @Override
+            protected HTable initialValue() {
+                try {
+                    return new HTable(config, tableName);
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        };
+
+    }
+
+    private HTable htable() {
+        return threadLocalHtable.get();
     }
 
     private byte[] effectiveKey(String key) {
@@ -83,7 +92,7 @@ public class HBaseWindowsStore implements WindowsStore {
         Get get = new Get(effectiveKey);
         Result result = null;
         try {
-            result = htable.get(get);
+            result = htable().get(get);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -111,7 +120,7 @@ public class HBaseWindowsStore implements WindowsStore {
 
         Result[] results = null;
         try {
-            results = htable.get(gets);
+            results = htable().get(gets);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -141,7 +150,7 @@ public class HBaseWindowsStore implements WindowsStore {
 
         final Iterator<Result> resultIterator;
         try {
-            resultIterator = htable.getScanner(scan).iterator();
+            resultIterator = htable().getScanner(scan).iterator();
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -192,7 +201,7 @@ public class HBaseWindowsStore implements WindowsStore {
         kryo.writeClassAndObject(output, value);
         put.add(family, ByteBuffer.wrap(qualifier), System.currentTimeMillis(), ByteBuffer.wrap(output.getBuffer(), 0, output.position()));
         try {
-            htable.put(put);
+            htable().put(put);
         } catch (InterruptedIOException | RetriesExhaustedWithDetailsException e) {
             throw new RuntimeException(e);
         }
@@ -211,7 +220,7 @@ public class HBaseWindowsStore implements WindowsStore {
         }
 
         try {
-            htable.put(list);
+            htable().put(list);
         } catch (InterruptedIOException | RetriesExhaustedWithDetailsException e) {
             throw new RuntimeException(e);
         }
@@ -223,7 +232,7 @@ public class HBaseWindowsStore implements WindowsStore {
 
         Delete delete = new Delete(effectiveKey(key), System.currentTimeMillis());
         try {
-            htable.delete(delete);
+            htable().delete(delete);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -239,7 +248,7 @@ public class HBaseWindowsStore implements WindowsStore {
             deleteBatch.add(delete);
         }
         try {
-            htable.delete(deleteBatch);
+            htable().delete(deleteBatch);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -248,7 +257,7 @@ public class HBaseWindowsStore implements WindowsStore {
     @Override
     public void shutdown() {
         try {
-            htable.close();
+            htable().close();
         } catch (IOException e) {
             log.error(e.getMessage(), e);
         }

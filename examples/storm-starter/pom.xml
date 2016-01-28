@@ -35,6 +35,7 @@
     <!-- see comment below... This fixes an annoyance with intellij -->
     <provided.scope>provided</provided.scope>
     <hbase.version>0.98.4-hadoop2</hbase.version>
+    <hbase.version>1.1.2</hbase.version>
   </properties>
 
   <profiles>

@@ -22,7 +22,9 @@ import org.apache.storm.coordination.BatchOutputCollector;
 import org.apache.storm.trident.operation.Aggregator;
 import org.apache.storm.trident.spout.IBatchID;
 import org.apache.storm.trident.tuple.TridentTuple;
+import org.apache.storm.trident.tuple.TridentTupleView;
 import org.apache.storm.trident.windowing.config.WindowConfig;
+import org.apache.storm.tuple.Fields;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,16 +41,19 @@ public class TridentWindowManager extends BaseTridentWindowManager<TridentBatchT
     private static final String TUPLE_PREFIX = "tu" + WindowsStore.KEY_SEPARATOR;
 
     private final String windowTupleTaskId;
+    private final TridentTupleView.FreshOutputFactory freshOutputFactory;
 
     private Long maxCachedTuplesSize;
+    private final Fields inputFields;
     private AtomicLong currentCachedTuplesSize = new AtomicLong();
 
     public TridentWindowManager(WindowConfig windowConfig, String windowTaskId, WindowsStore windowStore, Aggregator aggregator,
-                                BatchOutputCollector delegateCollector, Long maxTuplesCacheSize) {
+                                BatchOutputCollector delegateCollector, Long maxTuplesCacheSize, Fields inputFields) {
         super(windowConfig, windowTaskId, windowStore, aggregator, delegateCollector);
 
         this.maxCachedTuplesSize = maxTuplesCacheSize;
-
+        this.inputFields = inputFields;
+        freshOutputFactory = new TridentTupleView.FreshOutputFactory(inputFields);
         windowTupleTaskId = TUPLE_PREFIX + windowTaskId;
     }
 
@@ -75,6 +80,7 @@ public class TridentWindowManager extends BaseTridentWindowManager<TridentBatchT
                 log.warn("Ignoring unknown primary key entry from windows store [{}]", key);
             }
         }
+
 
         // get trigger values only if they have more than zero
         Iterable<Object> triggerObjects = windowStore.get(triggerKeys);
@@ -120,11 +126,11 @@ public class TridentWindowManager extends BaseTridentWindowManager<TridentBatchT
         for (int i = 0; i < tuples.size(); i++) {
             String key = keyOf(batchId);
             TridentTuple tridentTuple = tuples.get(i);
-            entries.add(new WindowsStore.Entry(key+i, tridentTuple));
+            entries.add(new WindowsStore.Entry(key+i, tridentTuple.select(inputFields)));
         }
-
         // tuples should be available in store before they are added to window manager
         windowStore.putAll(entries);
+
         for (int i = 0; i < tuples.size(); i++) {
             String key = keyOf(batchId);
             TridentTuple tridentTuple = tuples.get(i);
@@ -164,9 +170,10 @@ public class TridentWindowManager extends BaseTridentWindowManager<TridentBatchT
         }
 
         if(keys.size() > 0) {
-            Iterable<Object> storedTuples = windowStore.get(keys);
-            for (Object storedTuple : storedTuples) {
-                resultTuples.add((TridentTuple) storedTuple);
+            Iterable<Object> storedTupleValues = windowStore.get(keys);
+            for (Object storedTupleValue : storedTupleValues) {
+                TridentTuple tridentTuple = freshOutputFactory.create((List<Object>) storedTupleValue);
+                resultTuples.add(tridentTuple);
             }
         }
 
@@ -191,7 +198,7 @@ public class TridentWindowManager extends BaseTridentWindowManager<TridentBatchT
             keys.add(tupleKey(expiredTuple));
         }
 
-//        windowStore.removeAll(keys);
+        windowStore.removeAll(keys);
     }
 
     private String tupleKey(TridentBatchTuple tridentBatchTuple) {

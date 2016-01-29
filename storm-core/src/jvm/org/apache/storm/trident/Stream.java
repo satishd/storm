@@ -19,10 +19,8 @@ package org.apache.storm.trident;
 
 import org.apache.storm.generated.Grouping;
 import org.apache.storm.generated.NullStruct;
-import org.apache.storm.trident.fluent.ChainedAggregatorDeclarer;
 import org.apache.storm.grouping.CustomStreamGrouping;
-import org.apache.storm.tuple.Fields;
-import org.apache.storm.utils.Utils;
+import org.apache.storm.trident.fluent.ChainedAggregatorDeclarer;
 import org.apache.storm.trident.fluent.GlobalAggregationScheme;
 import org.apache.storm.trident.fluent.GroupedStream;
 import org.apache.storm.trident.fluent.IAggregatableStream;
@@ -32,11 +30,13 @@ import org.apache.storm.trident.operation.CombinerAggregator;
 import org.apache.storm.trident.operation.Filter;
 import org.apache.storm.trident.operation.Function;
 import org.apache.storm.trident.operation.ReducerAggregator;
+import org.apache.storm.trident.operation.builtin.Max;
+import org.apache.storm.trident.operation.builtin.Min;
 import org.apache.storm.trident.operation.impl.CombinerAggStateUpdater;
 import org.apache.storm.trident.operation.impl.FilterExecutor;
 import org.apache.storm.trident.operation.impl.GlobalBatchToPartition;
-import org.apache.storm.trident.operation.impl.ReducerAggStateUpdater;
 import org.apache.storm.trident.operation.impl.IndexHashBatchToPartition;
+import org.apache.storm.trident.operation.impl.ReducerAggStateUpdater;
 import org.apache.storm.trident.operation.impl.SingleEmitAggregator.BatchToPartition;
 import org.apache.storm.trident.operation.impl.TrueFilter;
 import org.apache.storm.trident.partition.GlobalGrouping;
@@ -56,6 +56,8 @@ import org.apache.storm.trident.state.StateFactory;
 import org.apache.storm.trident.state.StateSpec;
 import org.apache.storm.trident.state.StateUpdater;
 import org.apache.storm.trident.util.TridentUtils;
+import org.apache.storm.tuple.Fields;
+import org.apache.storm.utils.Utils;
 
 /**
  * A Stream represents the core data model in Trident, and can be thought of as a "stream" of tuples that are processed
@@ -354,7 +356,33 @@ public class Stream implements IAggregatableStream {
                .partitionAggregate(inputFields, agg, functionFields)
                .chainEnd();
     }  
-    
+
+    public Stream min(Fields inputFields, Fields outputFields) {
+        if(inputFields.size() > 1) {
+            throw new IllegalArgumentException("Only one field is allowed as input");
+        }
+        if(outputFields.size() > 1) {
+            throw new IllegalArgumentException("Only one field is allowed as output");
+        }
+
+        projectionValidation(inputFields);
+        Stream stream = project(inputFields);
+        return stream.aggregate(inputFields, new Min(), outputFields);
+    }
+
+    public Stream max(Fields inputFields, Fields outputFields) {
+        if(inputFields.size() > 1) {
+            throw new IllegalArgumentException("Only one field is allowed as input");
+        }
+        if(outputFields.size() > 1) {
+            throw new IllegalArgumentException("Only one field is allowed as output");
+        }
+
+        projectionValidation(inputFields);
+        Stream stream = project(inputFields);
+        return stream.aggregate(inputFields, new Max(), outputFields);
+    }
+
     public Stream aggregate(Aggregator agg, Fields functionFields) {
         return aggregate(null, agg, functionFields);
     }

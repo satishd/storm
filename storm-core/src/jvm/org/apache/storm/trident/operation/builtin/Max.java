@@ -19,27 +19,35 @@
 package org.apache.storm.trident.operation.builtin;
 
 import org.apache.storm.trident.operation.CombinerAggregator;
-import org.apache.storm.trident.tuple.TridentTuple;
+
+import java.util.Comparator;
 
 /**
+ * This aggregator computes the maximum of aggregated tuples in a stream. It assumes that the tuple has one value and
+ * it is an instance of {@code Comparable}.
  *
  */
-public class Max implements CombinerAggregator<Comparable<Object>> {
+public class Max extends AbstractComparisionAggreagator<Comparable<Object>> {
 
-    @Override
-    public Comparable<Object> init(TridentTuple tuple) {
-        return (Comparable<Object>) tuple.getValue(0);
+    private Max() {
     }
 
     @Override
-    public Comparable<Object> combine(Comparable<Object> val1, Comparable<Object> val2) {
-        if(val1 == null) return val2;
-        if(val2 == null) return val1;
-        return val1.compareTo(val2) > 0 ? val1 : val2;
+    protected Comparable<Object> compare(Comparable<Object> value1, Comparable<Object> value2) {
+        return value1.compareTo(value2) < 0 ? value1 : value2;
     }
 
-    @Override
-    public Comparable<Object> zero() {
-        return null;
+    /**
+     * Returns an aggregator computes the maximum of aggregated tuples in a stream. It assumes that the tuple has one value and
+     * it is an instance of {@code Comparable}.
+     *
+     * @return
+     */
+    public static CombinerAggregator<Comparable<Object>> withComparables() {
+        return new Max();
+    }
+
+    public  static <T> CombinerAggregator<T> withComparator(Comparator<T> comparator) {
+        return new MaxWithComparator<>(comparator);
     }
 }

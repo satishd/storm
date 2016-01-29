@@ -59,6 +59,8 @@ import org.apache.storm.trident.util.TridentUtils;
 import org.apache.storm.tuple.Fields;
 import org.apache.storm.utils.Utils;
 
+import java.util.Comparator;
+
 /**
  * A Stream represents the core data model in Trident, and can be thought of as a "stream" of tuples that are processed
  * as a series of small batches. A stream is partitioned accross the nodes in the cluster, and operations are
@@ -355,22 +357,57 @@ public class Stream implements IAggregatableStream {
         return chainedAgg()
                .partitionAggregate(inputFields, agg, functionFields)
                .chainEnd();
-    }  
-
-    public Stream min(Fields inputFields, Fields outputFields) {
-        if(inputFields.size() > 1) {
-            throw new IllegalArgumentException("Only one field is allowed as input");
-        }
-        if(outputFields.size() > 1) {
-            throw new IllegalArgumentException("Only one field is allowed as output");
-        }
-
-        projectionValidation(inputFields);
-        Stream stream = project(inputFields);
-        return stream.aggregate(inputFields, new Min(), outputFields);
     }
 
+    /**
+     *
+     * @param inputFields
+     * @param outputFields
+     * @return
+     */
+    public Stream min(Fields inputFields, Fields outputFields) {
+        return comparableStream(inputFields, outputFields)
+                .aggregate(inputFields, Min.withComparables(), outputFields);
+    }
+
+    /**
+     *
+     * @param inputFields
+     * @param outputFields
+     * @param comparator
+     * @param <T>
+     * @return
+     */
+    public <T> Stream min(Fields inputFields, Fields outputFields, Comparator<T> comparator) {
+        return comparableStream(inputFields, outputFields)
+                .aggregate(inputFields, Min.withComparator(comparator), outputFields);
+    }
+
+    /**
+     *
+     * @param inputFields
+     * @param outputFields
+     * @return
+     */
     public Stream max(Fields inputFields, Fields outputFields) {
+        return comparableStream(inputFields, outputFields)
+                .aggregate(inputFields, Max.withComparables(), outputFields);
+    }
+
+    /**
+     *
+     * @param inputFields
+     * @param outputFields
+     * @param comparator
+     * @param <T>
+     * @return
+     */
+    public <T> Stream max(Fields inputFields, Fields outputFields, Comparator<T> comparator) {
+        return comparableStream(inputFields, outputFields)
+                .aggregate(inputFields, Max.withComparator(comparator), outputFields);
+    }
+
+    private Stream comparableStream(Fields inputFields, Fields outputFields) {
         if(inputFields.size() > 1) {
             throw new IllegalArgumentException("Only one field is allowed as input");
         }
@@ -379,8 +416,7 @@ public class Stream implements IAggregatableStream {
         }
 
         projectionValidation(inputFields);
-        Stream stream = project(inputFields);
-        return stream.aggregate(inputFields, new Max(), outputFields);
+        return project(inputFields);
     }
 
     public Stream aggregate(Aggregator agg, Fields functionFields) {

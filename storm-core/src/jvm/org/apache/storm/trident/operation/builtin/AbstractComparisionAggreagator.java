@@ -19,35 +19,31 @@
 package org.apache.storm.trident.operation.builtin;
 
 import org.apache.storm.trident.operation.CombinerAggregator;
-
-import java.util.Comparator;
+import org.apache.storm.trident.tuple.TridentTuple;
 
 /**
- * This aggregator computes the minimum of aggregated tuples in a stream. It assumes that the tuple has one value and
- * it is an instance of {@code Comparable}.
+ * Abstract {@code CombinerAggregator} for comparing two values in a stream.
  *
  */
-public class Min extends AbstractComparisionAggreagator<Comparable<Object>> {
+public abstract class AbstractComparisionAggreagator<T> implements CombinerAggregator<T> {
 
-    private Min() {
+    @Override
+    public T init(TridentTuple tuple) {
+        return (T) tuple.getValue(0);
     }
 
     @Override
-    protected Comparable<Object> compare(Comparable<Object> value1, Comparable<Object> value2) {
-        return value1.compareTo(value2) > 0 ? value1 : value2;
+    public T combine(T value1, T value2) {
+        if(value1 == null) return value2;
+        if(value2 == null) return value1;
+        
+        return compare(value1, value2);
     }
 
-    /**
-     * Returns an aggregator computes the maximum of aggregated tuples in a stream. It assumes that the tuple has one value and
-     * it is an instance of {@code Comparable}.
-     *
-     * @return
-     */
-    public static CombinerAggregator<Comparable<Object>> withComparables() {
-        return new Min();
-    }
+    protected abstract T compare(T value1, T value2);
 
-    public  static <T> CombinerAggregator<T> withComparator(Comparator<T> comparator) {
-        return new MinWithComparator<>(comparator);
+    @Override
+    public T zero() {
+        return null;
     }
 }

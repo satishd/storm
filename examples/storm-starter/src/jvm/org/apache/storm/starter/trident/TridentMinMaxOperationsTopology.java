@@ -34,6 +34,8 @@ import org.apache.storm.tuple.Fields;
 import org.apache.storm.tuple.Values;
 import org.apache.storm.utils.Utils;
 
+import java.util.Comparator;
+
 
 public class TridentMinMaxOperationsTopology {
     public static class Split extends BaseFunction {
@@ -73,7 +75,14 @@ public class TridentMinMaxOperationsTopology {
                 each(new Fields("sentence"), new Split(), new Fields("word")).
                 each(new Fields("word"), new Debug("##### words"));
 
-        wordsStream.min(new Fields("word"), new Fields("lowest")).
+        Comparator<String> comparator = new Comparator<String>() {
+            @Override
+            public int compare(String o1, String o2) {
+                return 0;
+            }
+        };
+
+        wordsStream.min(new Fields("word"), new Fields("lowest"), ).
                 each(new Fields("lowest"), new Debug("#### lowest word"));
 
         wordsStream.max(new Fields("word"), new Fields("highest")).
@@ -101,5 +110,9 @@ public class TridentMinMaxOperationsTopology {
                 StormSubmitter.submitTopologyWithProgressBar(args[0]+"-"+ct++, conf, topology);
             }
         }
+    }
+
+    static class Value {
+
     }
 }

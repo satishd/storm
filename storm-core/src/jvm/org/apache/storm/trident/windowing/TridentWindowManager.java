@@ -59,8 +59,7 @@ public class TridentWindowManager extends BaseTridentWindowManager<TridentBatchT
         windowTupleTaskId = TUPLE_PREFIX + windowTaskId;
     }
 
-    public void prepare() {
-        super.prepare();
+    protected void initialize() {
 
         // get existing tuples and pending triggers for this operator-component/task and add them to WindowManager
         String windowTriggerInprocessId = WindowTridentProcessor.getWindowTriggerInprocessIdPrefix(windowTaskId);

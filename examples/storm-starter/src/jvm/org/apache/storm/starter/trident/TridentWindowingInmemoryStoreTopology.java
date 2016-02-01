@@ -66,6 +66,7 @@ public class TridentWindowingInmemoryStoreTopology {
         Stream stream = topology.newStream("spout1", spout).parallelismHint(16).each(new Fields("sentence"),
                 new Split(), new Fields("word"))
                 .window(windowConfig, windowStore, new Fields("word"), new CountAsAggregator(), new Fields("count"))
+//                .aggregate(new CountAsAggregator(), new Fields("count"))
                 .each(new Fields("count"), new Debug())
                 .each(new Fields("count"), new Echo(), new Fields("ct"))
                 .each(new Fields("ct"), new Debug());
@@ -133,18 +134,18 @@ public class TridentWindowingInmemoryStoreTopology {
         if (args.length == 0) {
             List<? extends WindowConfig> list = Arrays.asList(
                     SlidingCountWindow.of(1000, 100)
-//                    , TumblingCountWindow.of(1000)
-//                   ,SlidingDurationWindow.of(new BaseWindowedBolt.Duration(6, TimeUnit.SECONDS), new BaseWindowedBolt.Duration(3, TimeUnit.SECONDS))
-//                   ,TumblingDurationWindow.of(new BaseWindowedBolt.Duration(3, TimeUnit.SECONDS))
+                    ,TumblingCountWindow.of(100)
+                    ,SlidingDurationWindow.of(new BaseWindowedBolt.Duration(6, TimeUnit.SECONDS), new BaseWindowedBolt.Duration(3, TimeUnit.SECONDS))
+                    ,TumblingDurationWindow.of(new BaseWindowedBolt.Duration(3, TimeUnit.SECONDS))
             );
 
             for (WindowConfig windowConfig : list) {
                 LocalCluster cluster = new LocalCluster();
                 cluster.submitTopology("wordCounter", conf, buildTopology(mapState, windowConfig));
-//                Utils.sleep(60 * 1000);
-//                cluster.shutdown();
+                Utils.sleep(60 * 1000);
+                cluster.shutdown();
             }
-//            System.exit(1);
+            System.exit(1);
         } else {
             conf.setNumWorkers(3);
 //            StormSubmitter.submitTopologyWithProgressBar(args[0], conf, buildTopology(mapState, SlidingCountWindow.of(1000, 100)));

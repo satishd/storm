@@ -56,6 +56,7 @@ public abstract class BaseTridentWindowManager<T> implements ITridentWindowManag
     protected final Queue<TriggerResult> pendingTriggers = new ConcurrentLinkedQueue<>();
     protected final AtomicInteger triggerId = new AtomicInteger();
     private final String windowTriggerCountId;
+    private final TriggerPolicy<T> triggerPolicy;
 
     public BaseTridentWindowManager(WindowConfig windowConfig, String windowTaskId, WindowsStore windowStore, Aggregator aggregator,
                                     BatchOutputCollector delegateCollector) {
@@ -72,12 +73,21 @@ public abstract class BaseTridentWindowManager<T> implements ITridentWindowManag
         WindowStrategy<T> windowStrategy = windowStrategyFactory.create(windowConfig);
         EvictionPolicy<T> evictionPolicy = windowStrategy.getEvictionPolicy();
         windowManager.setEvictionPolicy(evictionPolicy);
-        TriggerPolicy<T> triggerPolicy = windowStrategy.getTriggerPolicy(windowManager, evictionPolicy);
+        triggerPolicy = windowStrategy.getTriggerPolicy(windowManager, evictionPolicy);
         windowManager.setTriggerPolicy(triggerPolicy);
+
     }
 
     @Override
     public void prepare() {
+        preInitialize();
+
+        initialize();
+
+        postInitialize();
+    }
+
+    private void preInitialize() {
         log.debug("Getting current trigger count for this component/task");
         // get trigger count value from store
         Object result = windowStore.get(windowTriggerCountId);
@@ -90,6 +100,12 @@ public abstract class BaseTridentWindowManager<T> implements ITridentWindowManag
         windowStore.put(windowTriggerCountId, currentCount);
         triggerId.set(currentCount);
     }
+
+    private void postInitialize() {
+        triggerPolicy.start();
+    }
+    
+    protected abstract void initialize();
 
     class TridentWindowLifeCycleListener implements WindowLifecycleListener<T> {
 

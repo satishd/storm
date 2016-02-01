@@ -41,6 +41,10 @@ public class InMemoryTridentWindowManager extends BaseTridentWindowManager<Tride
     }
 
     @Override
+    protected void initialize() {
+    }
+
+    @Override
     public List<TridentTuple> getTridentTuples(List<TridentTuple> tridentBatchTuples) {
         return tridentBatchTuples;
     }

@@ -127,7 +127,6 @@ public class TridentWindowingInmemoryStoreTopology {
 
     public static void main(String[] args) throws Exception {
         Config conf = new Config();
-//        conf.setMaxSpoutPending(100);
         WindowsStoreFactory mapState = new InMemoryWindowsStoreFactory();
         System.out.println("############ Using inmemory store..");
 
@@ -148,8 +147,7 @@ public class TridentWindowingInmemoryStoreTopology {
             System.exit(1);
         } else {
             conf.setNumWorkers(3);
-//            StormSubmitter.submitTopologyWithProgressBar(args[0], conf, buildTopology(mapState, SlidingCountWindow.of(1000, 100)));
-            StormSubmitter.submitTopologyWithProgressBar(args[0], conf, buildTopology(mapState, TumblingDurationWindow.of(new BaseWindowedBolt.Duration(3, TimeUnit.SECONDS))));
+            StormSubmitter.submitTopologyWithProgressBar(args[0], conf, buildTopology(mapState, SlidingCountWindow.of(1000, 100)));
         }
     }
 

@@ -104,7 +104,7 @@ public abstract class BaseTridentWindowManager<T> implements ITridentWindowManag
     private void postInitialize() {
         triggerPolicy.start();
     }
-    
+
     protected abstract void initialize();
 
     class TridentWindowLifeCycleListener implements WindowLifecycleListener<T> {
@@ -198,8 +198,15 @@ public abstract class BaseTridentWindowManager<T> implements ITridentWindowManag
     }
 
     public void shutdown() {
-        windowManager.shutdown();
+        log.error("######### in shutdown");
+        try {
+            windowManager.shutdown();
+        } catch (Exception e) {
+            log.error("################### Error occurred..", e);
+            e.printStackTrace();
+        }
         windowStore.shutdown();
+        log.error("######### finished shutdown successfully");
     }
 
 }

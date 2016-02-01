@@ -153,7 +153,7 @@ public class WindowManager<T> implements TriggerHandler {
     }
 
     public void shutdown() {
-        LOG.debug("Shutting down WindowManager");
+        LOG.error("Shutting down WindowManager");
         if (triggerPolicy != null) {
             triggerPolicy.shutdown();
         }

@@ -126,6 +126,7 @@ public class WindowTridentProcessor implements TridentProcessor {
 
     @Override
     public void cleanup() {
+        log.error("####### cleanup is called on processor");
         tridentWindowManager.shutdown();
     }
 

@@ -19,7 +19,6 @@ package org.apache.storm.starter.trident;
 
 import org.apache.storm.Config;
 import org.apache.storm.LocalCluster;
-import org.apache.storm.LocalDRPC;
 import org.apache.storm.StormSubmitter;
 import org.apache.storm.generated.StormTopology;
 import org.apache.storm.trident.Stream;
@@ -35,8 +34,6 @@ import org.apache.storm.tuple.Values;
 import org.apache.storm.utils.Utils;
 
 import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
@@ -89,20 +86,20 @@ public class TridentMinMaxOperationsTopology {
         return topology.build();
     }
 
-    public static StormTopology buildAnimalsTopology() {
+    public static StormTopology buildVehiclesTopology() {
 
-        FixedBatchSpout spout = new FixedBatchSpout(new Fields("animals"), 10, Animal.generateAnimals(20));
+        FixedBatchSpout spout = new FixedBatchSpout(new Fields("vehicles"), 10, Vehicle.generateVehicles(20));
         spout.setCycle(true);
 
         TridentTopology topology = new TridentTopology();
         Stream wordsStream = topology.newStream("spout1", spout).
-                each(new Fields("animals"), new Debug("##### words"));
+                each(new Fields("vehicles"), new Debug("##### words"));
 
-        wordsStream.min(new Fields("animals"), new Fields("youngest"), new AgeComparator()).
-                each(new Fields("youngest"), new Debug("#### youngest animal"));
+        wordsStream.min(new Fields("vehicles"), new Fields("fastest"), new SpeedComparator()).
+                each(new Fields("fastest"), new Debug("#### fastest vehicle"));
 
-        wordsStream.max(new Fields("animals"), new Fields("fastest"), new SpeedComparator()).
-                each(new Fields("fastest"), new Debug("#### fastest animal"));
+        wordsStream.max(new Fields("vehicles"), new Fields("efficient"), new EfficiencyComparator()).
+                each(new Fields("efficient"), new Debug("#### efficient vehicle"));
 
         return topology.build();
     }
@@ -110,7 +107,7 @@ public class TridentMinMaxOperationsTopology {
     public static void main(String[] args) throws Exception {
         Config conf = new Config();
         conf.setMaxSpoutPending(20);
-        StormTopology[] topologies = {buildAnimalsTopology()} ; //{buildWordsTopology(), buildNumbersTopology()};
+        StormTopology[] topologies = {buildWordsTopology(), buildNumbersTopology(), buildVehiclesTopology()};
         if (args.length == 0) {
             for (StormTopology topology : topologies) {
                 LocalCluster cluster = new LocalCluster();
@@ -128,46 +125,46 @@ public class TridentMinMaxOperationsTopology {
         }
     }
 
-    static class AgeComparator implements Comparator<Animal>, Serializable {
+    static class SpeedComparator implements Comparator<Vehicle>, Serializable {
         @Override
-        public int compare(Animal animal1, Animal animal2) {
-            return Integer.compare(animal1.age, animal2.age);
+        public int compare(Vehicle vehicle1, Vehicle vehicle2) {
+            return Integer.compare(vehicle1.maxSpeed, vehicle2.maxSpeed);
         }
     }
 
-    static class SpeedComparator implements Comparator<Animal>, Serializable {
+    static class EfficiencyComparator implements Comparator<Vehicle>, Serializable {
         @Override
-        public int compare(Animal animal1, Animal animal2) {
-            return Float.compare(animal1.speed, animal2.speed);
+        public int compare(Vehicle vehicle1, Vehicle vehicle2) {
+            return Double.compare(vehicle1.efficiency, vehicle2.efficiency);
         }
     }
 
-    static class Animal implements Serializable {
+    static class Vehicle implements Serializable {
         final String name;
-        final int age;
-        final float speed;
+        final int maxSpeed;
+        final double efficiency;
 
-        public Animal(String name, int age, float speed) {
+        public Vehicle(String name, int maxSpeed, double efficiency) {
             this.name = name;
-            this.age = age;
-            this.speed = speed;
+            this.maxSpeed = maxSpeed;
+            this.efficiency = efficiency;
         }
 
         @Override
         public String toString() {
-            return "Animal{" +
+            return "Vehicle{" +
                     "name='" + name + '\'' +
-                    ", age=" + age +
-                    ", speed=" + speed +
+                    ", maxSpeed=" + maxSpeed +
+                    ", efficiency=" + efficiency +
                     '}';
         }
 
-        public static List<Object>[] generateAnimals(int count) {
-            List<Object>[] animals = new List[count];
+        public static List<Object>[] generateVehicles(int count) {
+            List<Object>[] vehicles = new List[count];
             for(int i=0; i<count; i++) {
-                animals[i] = (new Values(new Animal("Animal-"+(i+1), ThreadLocalRandom.current().nextInt(0, 100), ThreadLocalRandom.current().nextInt(10, 30)*3.14f)));
+                vehicles[i] = (new Values(new Vehicle("Vehicle-"+(i+1), ThreadLocalRandom.current().nextInt(0, 100), ThreadLocalRandom.current().nextDouble(1, 5))));
             }
-            return animals;
+            return vehicles;
         }
     }
 }

@@ -21,5 +21,4 @@ public interface ITridentWindowManager<T> {
 
     public Queue<TridentWindowManager.TriggerResult> getPendingTriggers();
 
-    public String triggerKey(Integer currentTriggerId);
 }

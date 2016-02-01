@@ -46,13 +46,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 public abstract class BaseTridentWindowManager<T> implements ITridentWindowManager<T> {
     private static final Logger log = LoggerFactory.getLogger(BaseTridentWindowManager.class);
 
-    public static final String TRIGGER_PREFIX = "tr" + WindowsStore.KEY_SEPARATOR;
-    public static final String TRIGGER_COUNT_PREFIX = "tc" + WindowsStore.KEY_SEPARATOR;
-
     protected final WindowManager<T> windowManager;
     protected final Aggregator aggregator;
     protected final BatchOutputCollector delegateCollector;
-    protected final String windowTriggerTaskId;
     protected final String windowTaskId;
     protected final WindowsStore windowStore;
 
@@ -61,7 +57,6 @@ public abstract class BaseTridentWindowManager<T> implements ITridentWindowManag
     protected final AtomicInteger triggerId = new AtomicInteger();
     private final String windowTriggerCountId;
 
-
     public BaseTridentWindowManager(WindowConfig windowConfig, String windowTaskId, WindowsStore windowStore, Aggregator aggregator,
                                     BatchOutputCollector delegateCollector) {
         this.windowTaskId = windowTaskId;
@@ -69,8 +64,8 @@ public abstract class BaseTridentWindowManager<T> implements ITridentWindowManag
         this.aggregator = aggregator;
         this.delegateCollector = delegateCollector;
 
-        windowTriggerTaskId = TRIGGER_PREFIX + windowTaskId;
-        windowTriggerCountId = TRIGGER_COUNT_PREFIX + windowTaskId;
+        windowTriggerCountId = WindowTridentProcessor.TRIGGER_COUNT_PREFIX + windowTaskId;
+
         windowManager = new WindowManager<>(new TridentWindowLifeCycleListener());
 
         WindowStrategyFactory<T> windowStrategyFactory = new WindowStrategyFactory<>();
@@ -128,15 +123,11 @@ public abstract class BaseTridentWindowManager<T> implements ITridentWindowManag
 
         List<List<Object>> resultantAggregatedValue = collector.values;
         windowStore.put(windowTriggerCountId, currentTriggerId+1);
-        windowStore.put(triggerKey(currentTriggerId), resultantAggregatedValue);
+        windowStore.put(WindowTridentProcessor.generateWindowTriggerKey(windowTaskId, currentTriggerId), resultantAggregatedValue);
         pendingTriggers.add(new TriggerResult(currentTriggerId, resultantAggregatedValue));
     }
 
     protected abstract List<TridentTuple> getTridentTuples(List<T> tupleEvents);
-
-    public String triggerKey(Integer currentTriggerId) {
-        return windowTriggerTaskId + currentTriggerId;
-    }
 
     static class AccumulatedTuplesCollector implements TridentCollector {
 

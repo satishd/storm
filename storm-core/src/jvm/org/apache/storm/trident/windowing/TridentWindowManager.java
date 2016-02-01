@@ -29,7 +29,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -64,10 +63,13 @@ public class TridentWindowManager extends BaseTridentWindowManager<TridentBatchT
         super.prepare();
 
         // get existing tuples and pending triggers for this operator-component/task and add them to WindowManager
-        Iterable<String> allEntriesIterable = windowStore.getAllKeys();
-        String windowTriggerInprocessId = WindowTridentProcessor.getWindowTriggerInprocessId(this.windowTaskId);
+        String windowTriggerInprocessId = WindowTridentProcessor.getWindowTriggerInprocessIdPrefix(windowTaskId);
+        String windowTriggerTaskId = WindowTridentProcessor.getWindowTriggerTaskPrefix(windowTaskId);
+
         List<String> attemptedTriggerKeys = new ArrayList<>();
         List<String> triggerKeys = new ArrayList<>();
+
+        Iterable<String> allEntriesIterable = windowStore.getAllKeys();
         for (String key : allEntriesIterable) {
             if (key.startsWith(windowTupleTaskId)) {
                 System.out.println("####### windowTupleTaskId = " + windowTupleTaskId);
@@ -88,6 +90,7 @@ public class TridentWindowManager extends BaseTridentWindowManager<TridentBatchT
             }
         }
 
+        // these triggers will be retried as part of batch retries
         Set<Integer> triggersToBeIgnored = new HashSet<>();
         Iterable<Object> attemptedTriggers = windowStore.get(attemptedTriggerKeys);
         for (Object attemptedTrigger : attemptedTriggers) {

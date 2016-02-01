@@ -34,6 +34,7 @@ import org.apache.storm.tuple.Fields;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -47,6 +48,8 @@ public class WindowTridentProcessor implements TridentProcessor {
     private static final Logger log = LoggerFactory.getLogger(WindowTridentProcessor.class);
 
     public static final String TRIGGER_INPROCESS_PREFIX = "tip" + WindowsStore.KEY_SEPARATOR;
+    public static final String TRIGGER_PREFIX = "tr" + WindowsStore.KEY_SEPARATOR;
+    public static final String TRIGGER_COUNT_PREFIX = "tc" + WindowsStore.KEY_SEPARATOR;
 
     public static final String TRIGGER_FIELD_NAME = "_task_info";
     public static final long DEFAULT_INMEMORY_TUPLE_CACHE_LIMIT = 100l;
@@ -67,6 +70,7 @@ public class WindowTridentProcessor implements TridentProcessor {
     private TridentTupleView.ProjectionFactory projection;
     private TridentContext tridentContext;
     private ITridentWindowManager tridentWindowManager;
+    private String windowTaskId;
 
     public WindowTridentProcessor(WindowConfig windowConfig, String uniqueWindowId, WindowsStoreFactory windowStoreFactory,
                                   Fields inputFields, Aggregator aggregator, boolean storeTuplesInStore) {
@@ -95,8 +99,8 @@ public class WindowTridentProcessor implements TridentProcessor {
         projection = new TridentTupleView.ProjectionFactory(parents.get(0), inputFields);
 
         windowStore = windowStoreFactory.create();
-        String windowTaskId = windowId + WindowsStore.KEY_SEPARATOR + topologyContext.getThisTaskId() + WindowsStore.KEY_SEPARATOR;
-        windowTriggerInprocessId = getWindowTriggerInprocessId(windowTaskId);
+        windowTaskId = windowId + WindowsStore.KEY_SEPARATOR + topologyContext.getThisTaskId() + WindowsStore.KEY_SEPARATOR;
+        windowTriggerInprocessId = getWindowTriggerInprocessIdPrefix(windowTaskId);
 
         tridentWindowManager = storeTuplesInStore ?
                 new TridentWindowManager(windowConfig, windowTaskId, windowStore, aggregator, tridentContext.getDelegateCollector(), maxTuplesCacheSize, inputFields)
@@ -105,8 +109,12 @@ public class WindowTridentProcessor implements TridentProcessor {
         tridentWindowManager.prepare();
     }
 
-    static String getWindowTriggerInprocessId(String windowTaskId) {
+    public static String getWindowTriggerInprocessIdPrefix(String windowTaskId) {
         return TRIGGER_INPROCESS_PREFIX + windowTaskId;
+    }
+
+    public static String getWindowTriggerTaskPrefix(String windowTaskId) {
+        return TRIGGER_PREFIX + windowTaskId;
     }
 
     private Long getWindowTuplesCacheSize(Map conf) {
@@ -152,7 +160,7 @@ public class WindowTridentProcessor implements TridentProcessor {
         if (retriedAttempt(batchId)) {
             pendingTriggerIds = (List<Integer>) windowStore.get(inprocessTriggerKey(batchTxnId));
             for (Integer pendingTriggerId : pendingTriggerIds) {
-                triggerKeys.add(tridentWindowManager.triggerKey(pendingTriggerId));
+                triggerKeys.add(triggerKey(pendingTriggerId));
             }
             triggerValues = windowStore.get(triggerKeys);
 
@@ -167,7 +175,7 @@ public class WindowTridentProcessor implements TridentProcessor {
                 while (pendingTriggersIter.hasNext()) {
                     triggerResult = pendingTriggersIter.next();
                     for (List<Object> aggregatedResult : triggerResult.result) {
-                        String triggerKey = tridentWindowManager.triggerKey(triggerResult.id);
+                        String triggerKey = triggerKey(triggerResult.id);
                         triggerKeys.add(triggerKey);
                         values.add(aggregatedResult);
                         pendingTriggerIds.add(triggerResult.id);
@@ -186,7 +194,7 @@ public class WindowTridentProcessor implements TridentProcessor {
         collector.setContext(processorContext);
         int i = 0;
         for (Object resultValue : triggerValues) {
-            collector.emit(new ConsList(triggerKeys.get(i++), (List<Object>) resultValue));
+            collector.emit(new ConsList(new TriggerInfo(windowTaskId, pendingTriggerIds.get(i++)), (List<Object>) resultValue));
         }
         collector.setContext(null);
     }
@@ -213,6 +221,28 @@ public class WindowTridentProcessor implements TridentProcessor {
     @Override
     public TridentTuple.Factory getOutputFactory() {
         return collector.getOutputFactory();
+    }
+
+    public static class TriggerInfo implements Serializable {
+        public final String windowTaskId;
+        public final int triggerId;
+
+        public TriggerInfo(String windowTaskId, int triggerId) {
+            this.windowTaskId = windowTaskId;
+            this.triggerId = triggerId;
+        }
+
+        public String generateTriggerKey() {
+            return generateWindowTriggerKey(windowTaskId, triggerId);
+        }
+    }
+
+    public String triggerKey(int triggerId) {
+        return generateWindowTriggerKey(windowTaskId, triggerId);
+    }
+
+    public static String generateWindowTriggerKey(String windowTaskId, int triggerId) {
+        return TRIGGER_PREFIX + windowTaskId + triggerId;
     }
 
 }

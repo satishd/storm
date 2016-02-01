@@ -521,7 +521,7 @@ public class Stream implements IAggregatableStream {
         Fields fields = addTriggerField(functionFields);
 
         // when storeTuplesInStore is false then the given windowStoreFactory is only used to store triggers and
-        // that store is passed to WindowStateUpdater to remove them.
+        // that store is passed to WindowStateUpdater to remove them after committing the batch.
         Stream stream = _topology.addSourcedNode(this,
                 new ProcessorNode(_topology.getUniqueStreamId(),
                         _name,

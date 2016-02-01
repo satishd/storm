@@ -29,7 +29,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -59,8 +62,11 @@ public class TridentWindowManager extends BaseTridentWindowManager<TridentBatchT
 
     public void prepare() {
         super.prepare();
+
         // get existing tuples and pending triggers for this operator-component/task and add them to WindowManager
         Iterable<String> allEntriesIterable = windowStore.getAllKeys();
+        String windowTriggerInprocessId = WindowTridentProcessor.getWindowTriggerInprocessId(this.windowTaskId);
+        List<String> attemptedTriggerKeys = new ArrayList<>();
         List<String> triggerKeys = new ArrayList<>();
         for (String key : allEntriesIterable) {
             if (key.startsWith(windowTupleTaskId)) {
@@ -76,18 +82,27 @@ public class TridentWindowManager extends BaseTridentWindowManager<TridentBatchT
                 triggerKeys.add(key);
                 log.debug("Received trigger with key [{}]", key);
                 log.error("Received trigger with key [{}]", key);
-            } else {
-                log.warn("Ignoring unknown primary key entry from windows store [{}]", key);
+            } else if(key.startsWith(windowTriggerInprocessId)) {
+                attemptedTriggerKeys.add(key);
+                log.debug("Received earlier unsuccessful trigger [{}] from windows store [{}]", key);
             }
         }
 
+        Set<Integer> triggersToBeIgnored = new HashSet<>();
+        Iterable<Object> attemptedTriggers = windowStore.get(attemptedTriggerKeys);
+        for (Object attemptedTrigger : attemptedTriggers) {
+            triggersToBeIgnored.addAll((List<Integer>) attemptedTrigger);
+        }
 
         // get trigger values only if they have more than zero
         Iterable<Object> triggerObjects = windowStore.get(triggerKeys);
         int i=0;
         for (Object triggerObject : triggerObjects) {
             log.error("Received trigger value [{}]", triggerObject);
-            pendingTriggers.add(new TriggerResult(lastPart(triggerKeys.get(i++)), (List<List<Object>>) triggerObject));
+            int id = lastPart(triggerKeys.get(i++));
+            if(!triggersToBeIgnored.contains(id)) {
+                pendingTriggers.add(new TriggerResult(id, (List<List<Object>>) triggerObject));
+            }
         }
 
     }

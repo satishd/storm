@@ -53,6 +53,7 @@ public abstract class BaseTridentWindowManager<T> implements ITridentWindowManag
     protected final Aggregator aggregator;
     protected final BatchOutputCollector delegateCollector;
     protected final String windowTriggerTaskId;
+    protected final String windowTaskId;
     protected final WindowsStore windowStore;
 
     protected final Set<String> activeBatches = new HashSet<>();
@@ -63,6 +64,7 @@ public abstract class BaseTridentWindowManager<T> implements ITridentWindowManag
 
     public BaseTridentWindowManager(WindowConfig windowConfig, String windowTaskId, WindowsStore windowStore, Aggregator aggregator,
                                     BatchOutputCollector delegateCollector) {
+        this.windowTaskId = windowTaskId;
         this.windowStore = windowStore;
         this.aggregator = aggregator;
         this.delegateCollector = delegateCollector;
@@ -165,6 +167,23 @@ public abstract class BaseTridentWindowManager<T> implements ITridentWindowManag
             this.id = id;
             this.result = result;
         }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (!(o instanceof TriggerResult)) return false;
+
+            TriggerResult that = (TriggerResult) o;
+
+            return id == that.id;
+
+        }
+
+        @Override
+        public int hashCode() {
+            return id;
+        }
+
     }
 
     public Queue<TriggerResult> getPendingTriggers() {

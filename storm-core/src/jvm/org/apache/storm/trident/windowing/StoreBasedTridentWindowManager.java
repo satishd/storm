@@ -36,7 +36,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * This window manager uses {@code WindowsStore} for storing tuples and other trigger related information. It maintains
- * cache of tuples {@code maxCachedTuplesSize} without going to store for getting them.
+ * tuples cache of {@code maxCachedTuplesSize} without accessing store for getting them.
  *
  */
 public class StoreBasedTridentWindowManager extends AbstractTridentWindowManager<TridentBatchTuple> {
@@ -73,8 +73,6 @@ public class StoreBasedTridentWindowManager extends AbstractTridentWindowManager
         Iterable<String> allEntriesIterable = windowStore.getAllKeys();
         for (String key : allEntriesIterable) {
             if (key.startsWith(windowTupleTaskId)) {
-                System.out.println("####### windowTupleTaskId = " + windowTupleTaskId);
-                System.out.println("####### key = " + key);
                 int tupleIndexValue = lastPart(key);
                 String batchId = secondLastPart(key);
                 log.debug("Received tuple with batch [{}] and tuple index [{}]", batchId, tupleIndexValue);
@@ -147,6 +145,7 @@ public class StoreBasedTridentWindowManager extends AbstractTridentWindowManager
             TridentTuple tridentTuple = tuples.get(i);
             entries.add(new WindowsStore.Entry(key+i, tridentTuple.select(inputFields)));
         }
+
         // tuples should be available in store before they are added to window manager
         windowStore.putAll(entries);
 

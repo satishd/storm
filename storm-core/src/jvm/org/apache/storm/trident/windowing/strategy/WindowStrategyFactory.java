@@ -24,7 +24,10 @@ import org.apache.storm.trident.windowing.config.WindowConfig;
  *
  */
 //todo-sato add unit test for this factory
-public final class WindowStrategyFactory<T> {
+public final class WindowStrategyFactory {
+
+    private WindowStrategyFactory() {
+    }
 
     /**
      * Creates a {@code WindowStrategy} instance based on the given {@code windowConfig}.
@@ -32,7 +35,7 @@ public final class WindowStrategyFactory<T> {
      * @param windowConfig
      * @return
      */
-    public WindowStrategy<T> create(WindowConfig windowConfig) {
+    public static <T> WindowStrategy<T> create(WindowConfig windowConfig) {
         WindowStrategy<T> windowStrategy = null;
         WindowConfig.Type windowType = windowConfig.getWindowType();
         switch(windowType) {
@@ -54,4 +57,5 @@ public final class WindowStrategyFactory<T> {
 
         return windowStrategy;
     }
+
 }

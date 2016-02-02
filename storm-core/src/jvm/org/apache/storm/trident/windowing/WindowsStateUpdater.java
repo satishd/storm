@@ -18,6 +18,7 @@
  */
 package org.apache.storm.trident.windowing;
 
+import com.google.common.collect.Lists;
 import org.apache.commons.lang.IllegalClassException;
 import org.apache.storm.topology.FailedException;
 import org.apache.storm.trident.operation.TridentCollector;
@@ -55,10 +56,11 @@ public class WindowsStateUpdater implements StateUpdater<WindowsState> {
                     throw new IllegalClassException(WindowTridentProcessor.TriggerInfo.class, fieldValue.getClass());
                 }
                 WindowTridentProcessor.TriggerInfo triggerInfo = (WindowTridentProcessor.TriggerInfo) fieldValue;
-                log.error("Removing trigger key {} from store: {}", triggerInfo, windowsStore);
-                windowsStore.remove(triggerInfo.generateTriggerKey());
-                //todo-sato remove trigger-batch information from store
+                String triggerCompletedKey = WindowTridentProcessor.getWindowTriggerInprocessIdPrefix(triggerInfo.windowTaskId)+currentTxId;
 
+                log.error("Removing trigger key [{}] and trigger completed key [{}] from store: [{}]", triggerInfo, triggerCompletedKey, windowsStore);
+
+                windowsStore.removeAll(Lists.newArrayList(triggerInfo.generateTriggerKey(), triggerCompletedKey));
             } catch (Exception ex) {
                 log.warn(ex.getMessage());
                 collector.reportError(ex);

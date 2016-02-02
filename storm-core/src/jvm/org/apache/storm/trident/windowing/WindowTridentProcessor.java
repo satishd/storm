@@ -165,8 +165,10 @@ public class WindowTridentProcessor implements TridentProcessor {
                 triggerKeys.add(triggerKey(pendingTriggerId));
             }
             triggerValues = windowStore.get(triggerKeys);
+        }
 
-        } else {
+        // if there are no trigger values in earlier attempts or this is a new batch, emit pending triggers.
+        if(triggerValues == null) {
             pendingTriggerIds = new ArrayList<>();
             Queue<StoreBasedTridentWindowManager.TriggerResult> pendingTriggers = tridentWindowManager.getPendingTriggers();
             log.debug("pending triggers at batch: {} and triggers.size: {} ", batchId, pendingTriggers.size());
@@ -205,7 +207,7 @@ public class WindowTridentProcessor implements TridentProcessor {
         return windowTriggerInprocessId + batchTxnId;
     }
 
-    private Object getBatchTxnId(Object batchId) {
+    public static Object getBatchTxnId(Object batchId) {
         if (batchId instanceof IBatchID) {
             return ((IBatchID) batchId).getId();
         }
@@ -236,6 +238,14 @@ public class WindowTridentProcessor implements TridentProcessor {
 
         public String generateTriggerKey() {
             return generateWindowTriggerKey(windowTaskId, triggerId);
+        }
+
+        @Override
+        public String toString() {
+            return "TriggerInfo{" +
+                    "windowTaskId='" + windowTaskId + '\'' +
+                    ", triggerId=" + triggerId +
+                    '}';
         }
     }
 

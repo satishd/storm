@@ -72,8 +72,7 @@ public abstract class AbstractTridentWindowManager<T> implements ITridentWindowM
 
         windowManager = new WindowManager<>(new TridentWindowLifeCycleListener());
 
-        WindowStrategyFactory<T> windowStrategyFactory = new WindowStrategyFactory<>();
-        WindowStrategy<T> windowStrategy = windowStrategyFactory.create(windowConfig);
+        WindowStrategy<T> windowStrategy = WindowStrategyFactory.create(windowConfig);
         EvictionPolicy<T> evictionPolicy = windowStrategy.getEvictionPolicy();
         windowManager.setEvictionPolicy(evictionPolicy);
         triggerPolicy = windowStrategy.getTriggerPolicy(windowManager, evictionPolicy);

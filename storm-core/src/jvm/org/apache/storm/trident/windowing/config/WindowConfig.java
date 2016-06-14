@@ -19,8 +19,12 @@
 package org.apache.storm.trident.windowing.config;
 
 import org.apache.storm.trident.windowing.strategy.WindowStrategy;
+import org.apache.storm.tuple.ITuple;
+import org.apache.storm.tuple.Tuple;
+import org.apache.storm.windowing.WindowInfo;
 
 import java.io.Serializable;
+import java.util.List;
 
 /**
  * Windowing configuration with window and sliding length.
@@ -47,6 +51,8 @@ public interface WindowConfig extends Serializable {
     public <T> WindowStrategy<T> getWindowStrategy();
 
     public void validate();
+
+    public List<WindowInfo> assignWindows(ITuple Tuple);
 
     public enum Type {
         SLIDING_COUNT,

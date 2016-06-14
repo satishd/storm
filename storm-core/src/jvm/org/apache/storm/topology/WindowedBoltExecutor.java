@@ -23,6 +23,7 @@ import org.apache.storm.spout.CheckpointSpout;
 import org.apache.storm.task.IOutputCollector;
 import org.apache.storm.task.OutputCollector;
 import org.apache.storm.task.TopologyContext;
+import org.apache.storm.trident.windowing.config.WindowConfig;
 import org.apache.storm.tuple.Fields;
 import org.apache.storm.tuple.Tuple;
 import org.apache.storm.tuple.Values;
@@ -40,6 +41,7 @@ import org.apache.storm.windowing.WatermarkTimeEvictionPolicy;
 import org.apache.storm.windowing.WatermarkTimeTriggerPolicy;
 import org.apache.storm.windowing.WindowLifecycleListener;
 import org.apache.storm.windowing.WindowManager;
+import org.apache.storm.windowing.WindowsManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -63,7 +65,7 @@ public class WindowedBoltExecutor implements IRichBolt {
     private final IWindowedBolt bolt;
     private transient WindowedOutputCollector windowedOutputCollector;
     private transient WindowLifecycleListener<Tuple> listener;
-    private transient WindowManager<Tuple> windowManager;
+    private transient WindowsManager<Tuple> windowManager;
     private transient int maxLagMs;
     private transient String tupleTsFieldName;
     private transient String lateTupleStream;
@@ -138,6 +140,45 @@ public class WindowedBoltExecutor implements IRichBolt {
         } else if (slidingIntervalCount != null) {
             ensureCountLessThanMaxPending(slidingIntervalCount.value, maxSpoutPending);
         }
+    }
+
+    private WindowsManager<Tuple> initWindowsManager(WindowLifecycleListener<Tuple> lifecycleListener, Map stormConf,
+                                                   TopologyContext context) {
+
+        final WindowsManager windowsManager = new WindowsManager(getWindowConfig(stormConf), lifecycleListener);
+
+        return windowsManager;
+    }
+
+    private WindowConfig getWindowConfig(Map stormConf) {
+        Duration windowLengthDuration = null;
+        Count windowLengthCount = null;
+        Duration slidingIntervalDuration = null;
+        Count slidingIntervalCount = null;
+        // window length
+        if (stormConf.containsKey(Config.TOPOLOGY_BOLTS_WINDOW_LENGTH_COUNT)) {
+            windowLengthCount = new Count(((Number) stormConf.get(Config.TOPOLOGY_BOLTS_WINDOW_LENGTH_COUNT)).intValue());
+            if (stormConf.containsKey(Config.TOPOLOGY_BOLTS_SLIDING_INTERVAL_COUNT)) {
+                slidingIntervalCount = new Count(((Number) stormConf.get(Config.TOPOLOGY_BOLTS_SLIDING_INTERVAL_COUNT)).intValue());
+            } else {
+
+            }
+        } else if (stormConf.containsKey(Config.TOPOLOGY_BOLTS_WINDOW_LENGTH_DURATION_MS)) {
+            windowLengthDuration = new Duration(
+                    ((Number) stormConf.get(Config.TOPOLOGY_BOLTS_WINDOW_LENGTH_DURATION_MS)).intValue(),
+                    TimeUnit.MILLISECONDS);
+        }
+        // sliding interval
+        if (stormConf.containsKey(Config.TOPOLOGY_BOLTS_SLIDING_INTERVAL_COUNT)) {
+            slidingIntervalCount = new Count(((Number) stormConf.get(Config.TOPOLOGY_BOLTS_SLIDING_INTERVAL_COUNT)).intValue());
+        } else if (stormConf.containsKey(Config.TOPOLOGY_BOLTS_SLIDING_INTERVAL_DURATION_MS)) {
+            slidingIntervalDuration = new Duration(((Number) stormConf.get(Config.TOPOLOGY_BOLTS_SLIDING_INTERVAL_DURATION_MS)).intValue(), TimeUnit.MILLISECONDS);
+        } else {
+            // default is a sliding window of count 1
+            slidingIntervalCount = new Count(1);
+        }
+
+        return null;
     }
 
     private WindowManager<Tuple> initWindowManager(WindowLifecycleListener<Tuple> lifecycleListener, Map stormConf,
@@ -271,7 +312,7 @@ public class WindowedBoltExecutor implements IRichBolt {
         this.windowedOutputCollector = new WindowedOutputCollector(collector);
         bolt.prepare(stormConf, context, windowedOutputCollector);
         this.listener = newWindowLifecycleListener();
-        this.windowManager = initWindowManager(listener, stormConf, context);
+        this.windowManager = initWindowsManager(listener, stormConf, context);
         start();
         LOG.debug("Initialized window manager {} ", this.windowManager);
     }

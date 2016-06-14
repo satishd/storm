@@ -21,11 +21,14 @@ package org.apache.storm.trident.windowing.config;
 import org.apache.storm.topology.base.BaseWindowedBolt;
 import org.apache.storm.trident.windowing.strategy.SlidingDurationWindowStrategy;
 import org.apache.storm.trident.windowing.strategy.WindowStrategy;
+import org.apache.storm.tuple.ITuple;
+import org.apache.storm.windowing.WindowInfo;
+
+import java.util.List;
 
 /**
  * Represents configuration of sliding window based on duration. Window duration of {@code windowLength} slides
  * at every {@code slideLength} interval.
- *
  */
 public final class SlidingDurationWindow extends BaseWindowConfig {
 
@@ -36,6 +39,10 @@ public final class SlidingDurationWindow extends BaseWindowConfig {
     @Override
     public <T> WindowStrategy<T> getWindowStrategy() {
         return new SlidingDurationWindowStrategy<>(this);
+    }
+
+    public List<WindowInfo> assignWindows(ITuple tuple) {
+
     }
 
     public static SlidingDurationWindow of(BaseWindowedBolt.Duration windowDuration, BaseWindowedBolt.Duration slidingDuration) {

@@ -23,6 +23,7 @@ import org.apache.storm.spout.CheckpointSpout;
 import org.apache.storm.task.IOutputCollector;
 import org.apache.storm.task.OutputCollector;
 import org.apache.storm.task.TopologyContext;
+import org.apache.storm.trident.windowing.config.SlidingCountWindow;
 import org.apache.storm.trident.windowing.config.WindowConfig;
 import org.apache.storm.tuple.Fields;
 import org.apache.storm.tuple.Tuple;
@@ -65,7 +66,7 @@ public class WindowedBoltExecutor implements IRichBolt {
     private final IWindowedBolt bolt;
     private transient WindowedOutputCollector windowedOutputCollector;
     private transient WindowLifecycleListener<Tuple> listener;
-    private transient WindowsManager<Tuple> windowManager;
+    private transient WindowsManager<Tuple> windowsManager;
     private transient int maxLagMs;
     private transient String tupleTsFieldName;
     private transient String lateTupleStream;
@@ -142,7 +143,7 @@ public class WindowedBoltExecutor implements IRichBolt {
         }
     }
 
-    private WindowsManager<Tuple> initWindowsManager(WindowLifecycleListener<Tuple> lifecycleListener, Map stormConf,
+    private WindowsManager initWindowsManager(WindowLifecycleListener<Tuple> lifecycleListener, Map stormConf,
                                                    TopologyContext context) {
 
         final WindowsManager windowsManager = new WindowsManager(getWindowConfig(stormConf), lifecycleListener);
@@ -160,6 +161,7 @@ public class WindowedBoltExecutor implements IRichBolt {
             windowLengthCount = new Count(((Number) stormConf.get(Config.TOPOLOGY_BOLTS_WINDOW_LENGTH_COUNT)).intValue());
             if (stormConf.containsKey(Config.TOPOLOGY_BOLTS_SLIDING_INTERVAL_COUNT)) {
                 slidingIntervalCount = new Count(((Number) stormConf.get(Config.TOPOLOGY_BOLTS_SLIDING_INTERVAL_COUNT)).intValue());
+                return SlidingCountWindow.of(windowLengthCount, slidingIntervalCount);
             } else {
 
             }
@@ -312,9 +314,9 @@ public class WindowedBoltExecutor implements IRichBolt {
         this.windowedOutputCollector = new WindowedOutputCollector(collector);
         bolt.prepare(stormConf, context, windowedOutputCollector);
         this.listener = newWindowLifecycleListener();
-        this.windowManager = initWindowsManager(listener, stormConf, context);
+        this.windowsManager = initWindowsManager(listener, stormConf, context);
         start();
-        LOG.debug("Initialized window manager {} ", this.windowManager);
+        LOG.debug("Initialized window manager {} ", this.windowsManager);
     }
 
     @Override
@@ -322,7 +324,7 @@ public class WindowedBoltExecutor implements IRichBolt {
         if (isTupleTs()) {
             long ts = input.getLongByField(tupleTsFieldName);
             if (waterMarkEventGenerator.track(input.getSourceGlobalStreamId(), ts)) {
-                windowManager.add(input, ts);
+                windowsManager.add(input, ts);
             } else {
                 if (lateTupleStream != null) {
                     windowedOutputCollector.emit(lateTupleStream, input, new Values(input));
@@ -332,13 +334,13 @@ public class WindowedBoltExecutor implements IRichBolt {
                 windowedOutputCollector.ack(input);
             }
         } else {
-            windowManager.add(input);
+            windowsManager.add(input);
         }
     }
 
     @Override
     public void cleanup() {
-        windowManager.shutdown();
+        windowsManager.shutdown();
         bolt.cleanup();
     }
 

@@ -30,7 +30,7 @@ import java.util.List;
  * Represents configuration of sliding window based on duration. Window duration of {@code windowLength} slides
  * at every {@code slideLength} interval.
  */
-public final class SlidingDurationWindow extends BaseWindowConfig {
+public final class SlidingDurationWindow extends SlidingWindowConfig {
 
     private SlidingDurationWindow(int windowLength, int slideLength) {
         super(windowLength, slideLength);
@@ -42,7 +42,7 @@ public final class SlidingDurationWindow extends BaseWindowConfig {
     }
 
     public List<WindowInfo> assignWindows(ITuple tuple) {
-
+        return null;
     }
 
     public static SlidingDurationWindow of(BaseWindowedBolt.Duration windowDuration, BaseWindowedBolt.Duration slidingDuration) {

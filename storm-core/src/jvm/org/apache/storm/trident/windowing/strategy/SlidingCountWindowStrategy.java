@@ -18,6 +18,7 @@
  */
 package org.apache.storm.trident.windowing.strategy;
 
+import org.apache.storm.trident.windowing.config.SlidingWindowConfig;
 import org.apache.storm.trident.windowing.config.WindowConfig;
 import org.apache.storm.windowing.CountEvictionPolicy;
 import org.apache.storm.windowing.CountTriggerPolicy;
@@ -29,9 +30,9 @@ import org.apache.storm.windowing.TriggerPolicy;
  * This class represents sliding window strategy based on the sliding window count and sliding interval count from the
  * given {@code slidingCountWindow} configuration.
  */
-public class SlidingCountWindowStrategy<T> extends BaseWindowStrategy<T> {
+public class SlidingCountWindowStrategy<T> extends SlidingWindowStrategy<T> {
 
-    public SlidingCountWindowStrategy(WindowConfig slidingCountWindow) {
+    public SlidingCountWindowStrategy(SlidingWindowConfig slidingCountWindow) {
         super(slidingCountWindow);
     }
 

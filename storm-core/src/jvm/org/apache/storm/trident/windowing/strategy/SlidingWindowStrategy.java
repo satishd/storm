@@ -18,15 +18,16 @@
  */
 package org.apache.storm.trident.windowing.strategy;
 
+import org.apache.storm.trident.windowing.config.SlidingWindowConfig;
 import org.apache.storm.trident.windowing.config.WindowConfig;
 
 /**
  *
  */
-public abstract class BaseWindowStrategy<T> implements WindowStrategy<T> {
-    protected final WindowConfig windowConfig;
+public abstract class SlidingWindowStrategy<T> implements WindowStrategy<T> {
+    protected final SlidingWindowConfig windowConfig;
 
-    public BaseWindowStrategy(WindowConfig windowConfig) {
+    public SlidingWindowStrategy(SlidingWindowConfig windowConfig) {
         this.windowConfig = windowConfig;
     }
 }

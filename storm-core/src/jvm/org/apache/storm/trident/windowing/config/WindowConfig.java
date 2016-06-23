@@ -21,6 +21,8 @@ package org.apache.storm.trident.windowing.config;
 import org.apache.storm.trident.windowing.strategy.WindowStrategy;
 import org.apache.storm.tuple.ITuple;
 import org.apache.storm.tuple.Tuple;
+import org.apache.storm.windowing.EvictionPolicy;
+import org.apache.storm.windowing.TriggerPolicy;
 import org.apache.storm.windowing.WindowInfo;
 
 import java.io.Serializable;
@@ -32,32 +34,21 @@ import java.util.List;
 public interface WindowConfig extends Serializable {
 
     /**
-     * Returns the length of the window.
-     * @return
-     */
-    public int getWindowLength();
-
-    /**
-     * Returns the sliding length of the moving window.
-     * @return
-     */
-    public int getSlidingLength();
-
-    /**
-     * Gives the type of windowing. It can be any of {@code Type} values.
-     *
-     * @return
+     * @return WindowStrategy for the current window configuration.
      */
     public <T> WindowStrategy<T> getWindowStrategy();
 
     public void validate();
 
-    public List<WindowInfo> assignWindows(ITuple Tuple);
+    public TriggerPolicy createDefaultTriggerPolicy();
 
-    public enum Type {
-        SLIDING_COUNT,
-        TUMBLING_COUNT,
-        SLIDING_DURATION,
-        TUMBLING_DURATION
-    }
+    public EvictionPolicy getEvictionPolicy();
+
+    /**
+     * Returns windows which the given tuple belongs to.
+     *
+     * @param tuple
+     */
+    public List<WindowInfo> assignWindows(ITuple tuple);
+
 }

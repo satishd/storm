@@ -21,21 +21,27 @@ package org.apache.storm.trident.windowing.config;
 /**
  *
  */
-public abstract class BaseWindowConfig implements WindowConfig {
+public abstract class SlidingWindowConfig implements WindowConfig {
     protected final int windowLength;
     protected final int slideLength;
 
-    protected BaseWindowConfig(int windowLength, int slideLength) {
+    protected SlidingWindowConfig(int windowLength, int slideLength) {
         this.windowLength = windowLength;
         this.slideLength = slideLength;
     }
 
-    @Override
+    /**
+     * Returns the length of the window.
+     * @return
+     */
     public int getWindowLength() {
         return windowLength;
     }
 
-    @Override
+    /**
+     * Returns the sliding length of the moving window.
+     * @return
+     */
     public int getSlidingLength() {
         return slideLength;
     }

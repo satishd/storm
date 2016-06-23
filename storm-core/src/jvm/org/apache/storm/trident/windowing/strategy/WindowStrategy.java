@@ -21,6 +21,7 @@ package org.apache.storm.trident.windowing.strategy;
 import org.apache.storm.windowing.EvictionPolicy;
 import org.apache.storm.windowing.TriggerHandler;
 import org.apache.storm.windowing.TriggerPolicy;
+
 /**
  * Strategy for windowing which will have respective trigger and eviction policies.
  */

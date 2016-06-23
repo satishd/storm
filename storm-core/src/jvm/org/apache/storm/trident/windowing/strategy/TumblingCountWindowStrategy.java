@@ -18,6 +18,7 @@
  */
 package org.apache.storm.trident.windowing.strategy;
 
+import org.apache.storm.trident.windowing.config.SlidingWindowConfig;
 import org.apache.storm.trident.windowing.config.WindowConfig;
 import org.apache.storm.windowing.CountEvictionPolicy;
 import org.apache.storm.windowing.CountTriggerPolicy;
@@ -30,9 +31,9 @@ import org.apache.storm.windowing.TriggerPolicy;
  * given {@code slidingCountWindow} configuration. In this strategy , window and sliding lengths are equal.
  *
  */
-public final class TumblingCountWindowStrategy<T> extends BaseWindowStrategy<T> {
+public final class TumblingCountWindowStrategy<T> extends SlidingWindowStrategy<T> {
 
-    public TumblingCountWindowStrategy(WindowConfig tumblingCountWindow) {
+    public TumblingCountWindowStrategy(SlidingWindowConfig tumblingCountWindow) {
         super(tumblingCountWindow);
     }
 

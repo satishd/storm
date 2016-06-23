@@ -18,15 +18,22 @@
  */
 package org.apache.storm.trident.windowing.config;
 
+import org.apache.storm.topology.base.BaseWindowedBolt;
 import org.apache.storm.trident.windowing.strategy.SlidingCountWindowStrategy;
 import org.apache.storm.trident.windowing.strategy.WindowStrategy;
+import org.apache.storm.tuple.ITuple;
+import org.apache.storm.windowing.CountTriggerPolicy;
+import org.apache.storm.windowing.TriggerPolicy;
+import org.apache.storm.windowing.WindowInfo;
+
+import java.util.List;
 
 /**
  * Represents configuration of sliding window based on count of events. Window of length {@code windowLength} slides
  * at every count of given {@code slideLength}
  *
  */
-public final class SlidingCountWindow extends BaseWindowConfig {
+public final class SlidingCountWindow extends SlidingWindowConfig {
 
     private SlidingCountWindow(int windowLength, int slideLength) {
         super(windowLength, slideLength);
@@ -37,7 +44,21 @@ public final class SlidingCountWindow extends BaseWindowConfig {
         return new SlidingCountWindowStrategy<>(this);
     }
 
+    @Override
+    public TriggerPolicy getDefaultTriggerPolicy() {
+        return new CountTriggerPolicy();
+    }
+
+    @Override
+    public List<WindowInfo> assignWindows(ITuple tuple) {
+        return null;
+    }
+
     public static SlidingCountWindow of(int windowCount, int slidingCount) {
         return new SlidingCountWindow(windowCount, slidingCount);
+    }
+
+    public static WindowConfig of(BaseWindowedBolt.Count windowLengthCount, BaseWindowedBolt.Count slidingIntervalCount) {
+        return of(windowLengthCount.value, slidingIntervalCount.value);
     }
 }

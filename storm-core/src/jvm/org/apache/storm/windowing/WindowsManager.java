@@ -68,6 +68,10 @@ public class WindowsManager implements IWindowManager {
         }
     }
 
+    public void start() {
+        // activate triggers, esp time based triggers
+    }
+
     public void shutdown() {
         for (WindowManager<Tuple> windowManager : activeWindows.values()) {
             windowManager.shutdown();

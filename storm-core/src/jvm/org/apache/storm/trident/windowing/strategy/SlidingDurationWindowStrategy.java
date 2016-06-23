@@ -18,6 +18,7 @@
  */
 package org.apache.storm.trident.windowing.strategy;
 
+import org.apache.storm.trident.windowing.config.SlidingWindowConfig;
 import org.apache.storm.trident.windowing.config.WindowConfig;
 import org.apache.storm.windowing.EvictionPolicy;
 import org.apache.storm.windowing.TimeEvictionPolicy;
@@ -30,9 +31,9 @@ import org.apache.storm.windowing.TriggerPolicy;
  * given {@code slidingCountWindow} configuration.
  *
  **/
-public final class SlidingDurationWindowStrategy<T> extends BaseWindowStrategy<T> {
+public final class SlidingDurationWindowStrategy<T> extends SlidingWindowStrategy<T> {
 
-    public SlidingDurationWindowStrategy(WindowConfig slidingDurationWindow) {
+    public SlidingDurationWindowStrategy(SlidingWindowConfig slidingDurationWindow) {
         super(slidingDurationWindow);
     }
 

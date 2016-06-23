@@ -38,6 +38,9 @@ import static org.apache.storm.windowing.EvictionPolicy.Action.STOP;
  * Tracks a window of events and fires {@link WindowLifecycleListener} callbacks
  * on expiry of events or activation of the window due to {@link TriggerPolicy}.
  *
+ * todo abstract out window manager and push all the windowing state and work through contexts instead of having
+ * individual triggers maintaining the state.
+ *
  * @param <T> the type of event in the window.
  */
 public class WindowManager<T> implements TriggerHandler {

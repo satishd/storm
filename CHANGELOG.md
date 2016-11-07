@@ -1,4 +1,7 @@
 ## 2.0.0
+ * STORM-203: Adding paths to default java library path
+ * STORM-2175: fix double close of workers
+ * STORM-1985: Provide a tool for showing and killing corrupted topology
  * STORM-2012: Upgrade Kafka to 0.8.2.2
  * STORM-2142: ReportErrorAndDie runs suicide function only when InterruptedException or InterruptedIOException is thrown
  * STORM-2134: improving the current scheduling strategy for RAS
@@ -161,6 +164,14 @@
  * STORM-1769: Added a test to check local nimbus with notifier plugin
 
 ## 1.1.0
+ * STORM-2103: [SQL] Introduce new sql external module: storm-sql-mongodb
+ * STORM-2109: Under supervisor V2 SUPERVISOR_MEMORY_CAPACITY_MB and SUPERVISOR_CPU_CAPACITY must be Doubles
+ * STORM-2110: in supervisor v2 filter out empty command line args
+ * STORM-2117: Supervisor V2 with local mode extracts resources directory to topology root directory instead of temporary directory
+ * STORM-2131: Add blob command to worker-launcher, make stormdist directory not writeable by topo owner
+ * STORM-2018: Supervisor V2
+ * STORM-2139: Let ShellBolts and ShellSpouts run with scripts from blobs
+ * STORM-2072: Add map, flatMap with different outputs (T->V) in Trident
  * STORM-2125: Use Calcite's implementation of Rex Compiler
  * STORM-1444: Support EXPLAIN statement in StormSQL
  * STORM-2099: Introduce new sql external module: storm-sql-redis
@@ -219,6 +230,8 @@
  * STORM-1868: Modify TridentKafkaWordCount to run in distributed mode
 
 ## 1.0.3
+ * STORM-2018: Supervisor V2
+ * STORM-2145: Leave leader nimbus's hostname to log when trying to connect leader nimbus
  * STORM-2127: Storm-eventhubs should use latest amqp and eventhubs-client versions 
  * STORM-2040: Fix bug on assert-can-serialize
  * STORM-2017: ShellBolt stops reporting task ids
@@ -591,6 +604,9 @@
  * STORM-901: Worker Artifacts Directory
  * STORM-1144: Display requested and assigned cpu/mem resources for schedulers in UI
  * STORM-1217: making small fixes in RAS
+
+## 0.10.3
+ * STORM-2158: Fix OutOfMemoryError in Nimbus' SimpleTransportPlugin
 
 ## 0.10.2
  * STORM-1834: Documentation How to Generate Certificates For Local Testing SSL Setup

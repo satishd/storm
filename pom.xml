@@ -320,6 +320,7 @@
         <module>examples/storm-hive-examples</module>
         <module>examples/storm-elasticsearch-examples</module>
         <module>examples/storm-mqtt-examples</module>
+        <module>examples/storm-cassandra-examples</module>
     </modules>
 
     <dependencies>

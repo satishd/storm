@@ -96,6 +96,7 @@ public class BatchCassandraWriterBolt extends BaseCassandraBolt<List<Tuple>> {
      */
     @Override
     protected void process(Tuple input) {
+        LOG.info("############## "+ logPrefix() + "Tuple received and it will be added to queue...");
         if( ! queue.offer(input) ) {
             LOG.info(logPrefix() + "The message queue is full, preparing batch statement...");
             prepareAndExecuteStatement();
@@ -112,6 +113,7 @@ public class BatchCassandraWriterBolt extends BaseCassandraBolt<List<Tuple>> {
 
     public void prepareAndExecuteStatement() {
         int size = queue.size();
+        LOG.info("######### prepareAndExecuteStatement invoked and queue size: [{}]", size);
         if( size > 0 ) {
             List<Tuple> inputs = new ArrayList<>(size);
             queue.drainTo(inputs);

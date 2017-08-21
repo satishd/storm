@@ -44,7 +44,7 @@ public class StringGenSpout extends BaseRichSpout {
     private SpoutOutputCollector collector = null;
     ArrayList<String> records;
     private int curr=0;
-    private int count=0;
+    private long count=0;
 
     public StringGenSpout(int strLen) {
         this.strLen = strLen;
@@ -78,11 +78,10 @@ public class StringGenSpout extends BaseRichSpout {
     @Override
     public void nextTuple() {
         List<Object> tuple;
-        if( curr < strCount ) {
-            tuple = Collections.singletonList((Object) records.get(curr));
-            ++curr;
-            collector.emit(tuple, ++count);
-        }
+//        if( curr < strCount ) {
+            tuple = Collections.singletonList(records.get(++curr % records.size()));
+            collector.emit(tuple, count++);
+//        }
     }
 
 

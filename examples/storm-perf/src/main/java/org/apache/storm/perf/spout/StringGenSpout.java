@@ -31,10 +31,10 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
-/** Spout pre-computes a list with 30k fixed length random strings.
- *  Emits sequentially from this list, over and over again.
+/**
+ * Spout pre-computes a list with 30k fixed length random strings.
+ * Emits sequentially from this list, over and over again.
  */
-
 public class StringGenSpout extends BaseRichSpout {
 
     private static final String DEFAULT_FIELD_NAME = "str";
@@ -43,8 +43,8 @@ public class StringGenSpout extends BaseRichSpout {
     private String fieldName = DEFAULT_FIELD_NAME;
     private SpoutOutputCollector collector = null;
     ArrayList<String> records;
-    private int curr=0;
-    private int count=0;
+    private int curr = 0;
+    private long count = 0;
 
     public StringGenSpout(int strLen) {
         this.strLen = strLen;
@@ -57,7 +57,7 @@ public class StringGenSpout extends BaseRichSpout {
 
     @Override
     public void declareOutputFields(OutputFieldsDeclarer declarer) {
-        declarer.declare( new Fields(fieldName) );
+        declarer.declare(new Fields(fieldName));
     }
 
     @Override
@@ -70,7 +70,7 @@ public class StringGenSpout extends BaseRichSpout {
     private static ArrayList<String> genStringList(int strLen, int count) {
         ArrayList<String> result = new ArrayList<String>(count);
         for (int i = 0; i < count; i++) {
-            result.add( RandomStringUtils.random(strLen) );
+            result.add(RandomStringUtils.random(strLen));
         }
         return result;
     }
@@ -78,11 +78,8 @@ public class StringGenSpout extends BaseRichSpout {
     @Override
     public void nextTuple() {
         List<Object> tuple;
-        if( curr < strCount ) {
-            tuple = Collections.singletonList((Object) records.get(curr));
-            ++curr;
-            collector.emit(tuple, ++count);
-        }
+        tuple = Collections.singletonList(records.get(++curr % records.size()));
+        collector.emit(tuple, count++);
     }
 
 

@@ -35,7 +35,9 @@ public class ConstSpout extends BaseRichSpout {
     private String value;
     private String fieldName = DEFAUT_FIELD_NAME;
     private SpoutOutputCollector collector = null;
-    private int count=0;
+    private int count = 0;
+    private Long sleep = 0L;
+    private int ackCount = 0;
 
     public ConstSpout(String value) {
         this.value = value;
@@ -58,13 +60,21 @@ public class ConstSpout extends BaseRichSpout {
 
     @Override
     public void nextTuple() {
-        List<Object> tuple = Collections.singletonList((Object) value);
+        List<Object> tuple = Collections.singletonList(value);
         collector.emit(tuple, count++);
+        try {
+            if (sleep > 0) {
+                Thread.sleep(sleep);
+            }
+        } catch (InterruptedException e) {
+
+        }
     }
 
     @Override
     public void ack(Object msgId) {
         super.ack(msgId);
+        ackCount++;
     }
 
 }
